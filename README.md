@@ -1,8 +1,9 @@
 # opencode-codex-quota
 
+[![npm version](https://img.shields.io/npm/v/opencode-codex-quota.svg)](https://www.npmjs.com/package/opencode-codex-quota)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Issues](https://img.shields.io/github/issues/guyinwonder168/opencode-codex-quota.svg)](https://github.com/guyinwonder168/opencode-codex-quota/issues)
-[![Bun](https://img.shields.io/badge/runtime-bun-black.svg)](https://bun.sh)
+[![CI](https://github.com/guyinwonder168/opencode-codex-quota/actions/workflows/ci.yml/badge.svg)](https://github.com/guyinwonder168/opencode-codex-quota/actions/workflows/ci.yml)
 
 OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota** directly in the terminal — no browser needed.
 
@@ -23,13 +24,21 @@ OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota**
 
 ## Install
 
-### Via OpenCode CLI (recommended)
+### Via npm (recommended)
 
 ```bash
-opencode plugin install opencode-codex-quota
+npm install -g opencode-codex-quota
 ```
 
-### Via config file
+Or with your preferred package manager:
+
+```bash
+bun add -g opencode-codex-quota     # Bun
+pnpm add -g opencode-codex-quota    # pnpm
+yarn global add opencode-codex-quota # Yarn
+```
+
+### Via OpenCode config
 
 Add to your OpenCode config (`~/.config/opencode/config.json`):
 
@@ -37,6 +46,14 @@ Add to your OpenCode config (`~/.config/opencode/config.json`):
 {
   "plugin": ["opencode-codex-quota"]
 }
+```
+
+OpenCode auto-installs npm plugins at startup using Bun.
+
+### Via OpenCode CLI
+
+```bash
+opencode plugin install opencode-codex-quota
 ```
 
 ### From source (development)

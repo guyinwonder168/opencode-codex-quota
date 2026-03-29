@@ -1,0 +1,53 @@
+{
+  "name": "opencode-codex-quota",
+  "version": "0.1.0",
+  "description": "OpenCode plugin to display ChatGPT Plus/Pro Codex subscription quota in the terminal",
+  "keywords": [
+    "opencode",
+    "plugin",
+    "codex",
+    "quota",
+    "chatgpt",
+    "openai",
+    "subscription",
+    "usage",
+    "tui"
+  ],
+  "homepage": "https://github.com/guyinwonder168/opencode-codex-quota#readme",
+  "bugs": {
+    "url": "https://github.com/guyinwonder168/opencode-codex-quota/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guyinwonder168/opencode-codex-quota.git"
+  },
+  "license": "MIT",
+  "author": "guyinwonder168",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepublishOnly": "bun run build",
+    "release": "np"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^1.3.5"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.3.5",
+    "typescript": "^5.7.0",
+    "@types/bun": "^1.2.0",
+    "bun-types": "^1.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
