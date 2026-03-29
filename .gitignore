@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Temp / cache
+.tmp/
+*.tgz
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment (never commit)
+.env
+.env.*
+!.env.example
+
+# Debug
+npm-debug.log*
+bun-debug.log*
