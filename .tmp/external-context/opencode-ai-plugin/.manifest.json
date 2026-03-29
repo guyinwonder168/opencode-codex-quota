@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-29T12:00:00Z",
+  "libraries": {
+    "@opencode-ai/plugin": {
+      "files": [
+        {
+          "filename": "sdk-types-index.d.ts.md",
+          "topic": "Full TypeScript type signatures (index.d.ts)",
+          "tech_stack": "TypeScript",
+          "fetched": "2026-03-29T12:00:00Z",
+          "source": "unpkg.com (npm v1.3.5)"
+        },
+        {
+          "filename": "sdk-types-tool.d.ts.md",
+          "topic": "Tool type signatures (tool.d.ts) with tool.schema/Zod patterns",
+          "tech_stack": "TypeScript",
+          "fetched": "2026-03-29T12:00:00Z",
+          "source": "unpkg.com (npm v1.3.5)"
+        },
+        {
+          "filename": "official-plugin-guide.md",
+          "topic": "Official plugin guide with all examples and event types",
+          "tech_stack": "TypeScript/JavaScript",
+          "fetched": "2026-03-29T12:00:00Z",
+          "source": "opencode.ai/docs/plugins"
+        },
+        {
+          "filename": "reference-implementations.md",
+          "topic": "Reference implementations from slkiser/opencode-quota and guyinwonder168/opencode-glm-quota",
+          "tech_stack": "TypeScript",
+          "fetched": "2026-03-29T12:00:00Z",
+          "source": "GitHub"
+        }
+      ]
+    }
+  }
+}
