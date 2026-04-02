@@ -73,6 +73,14 @@ const DEFAULT_AUTH_PATH = join(
 /** Provider keys scanned in priority order (PRD §7.2 first-match-wins). */
 const PROVIDER_KEYS = ["codex", "openai", "chatgpt", "opencode"] as const;
 
+interface AuthEntry {
+  type?: string;
+  access?: string;
+  expires?: number;
+}
+
+type AuthFile = Record<string, AuthEntry>;
+
 /**
  * Read auth.json and return validated credentials, or a typed error code.
  *
@@ -93,15 +101,9 @@ export async function readAuth(
   }
 
   // Parse JSON (malformed file → E9)
-  let authData: Record<
-    string,
-    { type?: string; access?: string; expires?: number }
-  >;
+  let authData: AuthFile;
   try {
-    authData = JSON.parse(content) as Record<
-      string,
-      { type?: string; access?: string; expires?: number }
-    >;
+    authData = JSON.parse(content) as AuthFile;
   } catch {
     return { ok: false, error: "E9" };
   }

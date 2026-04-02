@@ -109,6 +109,14 @@ describe("readAuth", () => {
     if (!result.ok) expect(result.error).toBe("E9")
   })
 
+  test("E9: returns error when auth.json contains malformed JSON", async () => {
+    const authFile = join(tempDir, "auth.json")
+    await writeFile(authFile, "not json at all")
+    const result = await readAuth(authFile)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toBe("E9")
+  })
+
   // --- E10: wrong auth type (not "oauth") ---
   test("E10: returns error when auth type is not 'oauth'", async () => {
     const authFile = join(tempDir, "auth.json")
