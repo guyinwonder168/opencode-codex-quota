@@ -881,6 +881,29 @@ git add src/services/api-client.ts tests/api-client.test.ts
 git commit -m "feat: ApiClient service — query wham/usage with timeout, validation, E4-E8 errors"
 ```
 
+### Task 4 — Implementation Improvements (Code Quality Review)
+
+After spec compliance review (PASS), a code quality review identified 4 issues that were fixed:
+
+1. **🔴 HIGH — Deeper `validateResponse()`**: Original only checked top-level types (`typeof "object"` for nested fields). Fixed to validate all required nested fields:
+   - Top-level: `user_id`, `account_id`, `email`, `plan_type` must be strings
+   - `rate_limit`: `allowed` and `limit_reached` must be booleans
+   - `primary_window` / `secondary_window`: when present, validates `used_percent`, `limit_window_seconds`, `reset_after_seconds`, `reset_at` as numbers
+   - `credits`: `has_credits`, `unlimited` booleans, `balance` string
+   - `spend_control`: `reached` boolean
+
+2. **🟡 MEDIUM — Unhandled HTTP status codes**: Added catch-all for non-2xx status codes not explicitly handled (e.g., 400, 404, 422). Returns E8.
+
+3. **🟡 MEDIUM — Missing edge-case tests**: Added 4 new tests (17 total):
+   - Non-JSON 200 response body → E4
+   - Empty token string → E5
+   - Empty accountId string → E5
+   - Unhandled 404 status → E8
+
+4. **🟡 MEDIUM — Empty input guard**: `queryQuota` now early-returns E5 for empty/whitespace `token` or `accountId` before making network calls.
+
+**Final stats**: 17 tests, 35 total suite, `tsc --noEmit` clean, `biome check` clean.
+
 ---
 
 ## Task 5: Formatter — Markdown Output
