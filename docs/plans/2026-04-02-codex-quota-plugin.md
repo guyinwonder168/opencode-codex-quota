@@ -6,7 +6,7 @@
 
 **Architecture:** Component-Service pattern — `AuthReader` reads `~/.local/share/opencode/auth.json`, parses JWT for account_id + email. `ApiClient` calls `chatgpt.com/backend-api/wham/usage` with OAuth token. `Formatter` transforms the typed response into raw Markdown string. Plugin entry point uses the modern OpenCode `default export { id, server }` module shape and wires everything into a single `codex_quota` tool.
 
-**Command Behavior:** In current OpenCode, plugin tools are exposed to the LLM/tool loop. Custom `/` commands are prompt templates, not direct tool syscalls. Therefore `/codex_quota` must be implemented as a reliable wrapper prompt that strongly instructs OpenCode to call the `codex_quota` tool. A true no-LLM direct slash-command path is out of scope for this plan because current plugin docs/source do not expose one.
+**Command Behavior:** In current OpenCode, plugin tools are exposed to the LLM/tool loop. Custom `/` command `template` strings are static, so argument-aware slash-command behavior must be implemented with `template: ""` plus a `command.execute.before` hook that reads `input.arguments` and injects the wrapper instruction into `output.parts`. This keeps `/codex_quota` LLM-mediated while allowing `/codex_quota compact` to route to compact mode and all other inputs to default to full mode.
 
 **Tech Stack:** TypeScript (strict), Node.js, `vitest`, `@opencode-ai/plugin` SDK (Zod-based `tool.schema`), `biome` for linting, zero runtime dependencies beyond the SDK.
 
@@ -1743,8 +1743,10 @@ git commit -m "feat: error formatter — Markdown output for all E1–E11 scenar
 **Modernization requirements for this task:**
 - Use `export default { id, server }` (modern `PluginModule` shape), not the legacy named function export.
 - Keep the server implementation as a small internal `Plugin` function.
-- Register `/codex_quota` as a wrapper prompt with a non-empty template that explicitly tells OpenCode to call the `codex_quota` tool.
+- Register `/codex_quota` with `template: ""` and implement argument-aware routing in `command.execute.before`.
+- Default unknown or empty slash-command arguments to full mode.
 - Keep the wrapper honest: it improves reliability, but it is still LLM-mediated.
+- Include anti-summarization wording so tool output is presented verbatim and exact reset clocks are not rewritten.
 - Package the plugin for npm loading with `exports["./server"]` and `main: "./dist/index.js"`.
 
 **Step 1: Write failing test for the plugin entry point**
@@ -1773,16 +1775,30 @@ describe("default plugin module", () => {
     expect(result.tool).toHaveProperty("codex_quota")
   })
 
-  test("config hook registers /codex_quota wrapper prompt", async () => {
+  test("config hook registers /codex_quota command", async () => {
     const mod = await import("../src/index")
     const hooks = await mod.default.server({} as never)
-    const cfg: { command?: Record<string, { template: string; description: string }> } = {}
+    const cfg: { command?: Record<string, { template: string; description: string; subtask: boolean }> } = {}
 
     await hooks.config?.(cfg as never)
 
     expect(cfg.command?.codex_quota).toBeDefined()
     expect(cfg.command?.codex_quota.description).toContain("quota")
-    expect(cfg.command?.codex_quota.template).toContain("Call the codex_quota tool")
+    expect(cfg.command?.codex_quota.template).toBe("")
+    expect(cfg.command?.codex_quota.subtask).toBe(true)
+  })
+
+  test("command.execute.before injects compact/full wrapper text", async () => {
+    const mod = await import("../src/index")
+    const hooks = await mod.default.server({} as never)
+    const output = { parts: [] as Array<{ type: string; text?: string }> }
+
+    await hooks["command.execute.before"]?.(
+      { command: "codex_quota", sessionID: "test", arguments: "compact" },
+      output as never,
+    )
+
+    expect(output.parts[0]?.text).toContain("mode=compact")
   })
 })
 ```
@@ -1798,11 +1814,26 @@ Expected: FAIL — `src/index.ts` is empty
 
 ```typescript
 import { type Plugin, type PluginModule, tool } from "@opencode-ai/plugin"
+import type { Part } from "@opencode-ai/sdk"
 import { readAuth } from "./services/auth-reader"
 import { queryQuota } from "./services/api-client"
 import { formatQuota } from "./formatter/markdown"
 import { formatError } from "./formatter/errors"
 import type { DisplayMode } from "./types"
+
+const resolveModeFromArgs = (args: string): DisplayMode =>
+  args.trim().toLowerCase() === "compact" ? "compact" : "full"
+
+const buildCommandInstruction = (mode: DisplayMode): string => {
+  const modeArg = mode === "compact" ? "compact" : "full"
+  return [
+    `Call the codex_quota tool now with mode=${modeArg}.`,
+    "",
+    "CRITICAL: Output the tool result VERBATIM — do NOT summarize, reformat, paraphrase, or convert any values.",
+    "Copy the Markdown table EXACTLY as returned by the tool.",
+    "Do NOT convert clock times (like '04:06:26') into relative times (like '~4h 6m').",
+  ].join("\n")
+}
 
 const codexQuotaServer: Plugin = async () => {
   return {
@@ -1810,9 +1841,16 @@ const codexQuotaServer: Plugin = async () => {
       opencodeConfig.command ??= {}
       opencodeConfig.command.codex_quota = {
         description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
-        template:
-          "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.",
+        template: "",
+        subtask: true,
       }
+    },
+    "command.execute.before": async (input, output) => {
+      if (input.command !== "codex_quota") return
+
+      const mode = resolveModeFromArgs(input.arguments)
+      output.parts.length = 0
+      output.parts.push({ type: "text", text: buildCommandInstruction(mode) } as Part)
     },
     tool: {
       codex_quota: tool({
@@ -1823,7 +1861,7 @@ const codexQuotaServer: Plugin = async () => {
           ),
         },
         async execute(args) {
-          // Invalid or missing mode → treat as "full" (PRD 8.4)
+          // Invalid or missing direct tool mode → treat as "full" (PRD 8.4)
           const mode: DisplayMode = args.mode === "compact" ? "compact" : "full"
 
           // Step 1: Read auth — fresh read on each call (PRD 11.3)

@@ -304,9 +304,10 @@ args: {
 }
 ```
 
-- **User runs `/codex_quota`** → OpenCode executes the command template, which instructs the agent to call the `codex_quota` tool with default `mode: "full"`
-- **Agent calls tool** → can pass `mode: "compact"` for concise output
-- **Invalid mode** → treated as `"full"`
+- **User runs `/codex_quota compact`** → `command.execute.before` reads `input.arguments` and injects an instruction that tells OpenCode to call `codex_quota` with `mode: "compact"`
+- **User runs `/codex_quota`**, **`/codex_quota full`**, or any unknown argument → the hook injects a full-mode instruction
+- **Agent calls tool directly** → can still pass `mode: "compact"` for concise output
+- **Invalid or unknown mode** → treated as `"full"`
 
 ### 8.5 Plugin API Contract
 
@@ -316,6 +317,21 @@ Based on `@opencode-ai/plugin` (documented at https://opencode.ai/docs/plugins/)
 
 ```typescript
 import { type Plugin, type PluginModule, tool } from "@opencode-ai/plugin"
+import type { Part } from "@opencode-ai/sdk"
+
+const resolveModeFromArgs = (args: string): DisplayMode =>
+  args.trim().toLowerCase() === "compact" ? "compact" : "full"
+
+const buildCommandInstruction = (mode: DisplayMode): string => {
+  const modeArg = mode === "compact" ? "compact" : "full"
+  return [
+    `Call the codex_quota tool now with mode=${modeArg}.`,
+    "",
+    "CRITICAL: Output the tool result VERBATIM — do NOT summarize, reformat, paraphrase, or convert any values.",
+    "Copy the Markdown table EXACTLY as returned by the tool.",
+    "Do NOT convert clock times (like '04:06:26') into relative times (like '~4h 6m').",
+  ].join("\n")
+}
 
 const codexQuotaServer: Plugin = async (ctx) => {
   return {
@@ -323,9 +339,20 @@ const codexQuotaServer: Plugin = async (ctx) => {
       opencodeConfig.command ??= {}
       opencodeConfig.command.codex_quota = {
         description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
-        template:
-          "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.",
+        template: "",
+        subtask: true,
       }
+    },
+    "command.execute.before": async (input, output) => {
+      if (input.command !== "codex_quota") return
+
+      const mode = resolveModeFromArgs(input.arguments)
+
+      output.parts.length = 0
+      output.parts.push({
+        type: "text",
+        text: buildCommandInstruction(mode),
+      } as Part)
     },
     tool: {
       codex_quota: tool({
@@ -358,7 +385,9 @@ export default {
 |--------|--------|
 | Export | Default export object with `id` + `server` |
 | Plugin context | `{ project, client, $, directory, worktree }` |
-| Slash command | Wrapper prompt registered via `config.command.codex_quota` |
+| Slash command | Registered via `config.command.codex_quota` with `template: ""` and populated dynamically in `command.execute.before` |
+| Slash command args | `command.execute.before` receives `input.arguments` as the raw slash-command argument string |
+| Command output mutation | Hook rewrites `output.parts` to inject the exact wrapper instruction presented to the LLM |
 | Tool registration | `return { tool: { <name>: tool({ description, args, execute }) } }` |
 | Schema builder | `tool.schema.string()`, `tool.schema.optional()`, `.describe()` — Zod-based |
 | Execute args | First arg: validated args object. Second arg: `{ directory, worktree }` |
@@ -370,7 +399,8 @@ export default {
 - Plugin function is called once at load time; hooks/tools are registered statically
 - No lifecycle hooks needed — fresh read on each `execute()` call (no caching, per G5)
 - Tool name `codex_quota` is the identifier the agent calls
-- `/codex_quota` is a convenience wrapper prompt, not a direct no-LLM syscall
+- `/codex_quota` remains LLM-mediated, not a direct no-LLM syscall
+- Because the slash command is still LLM-mediated, the injected prompt must explicitly require verbatim output so exact reset clocks (for example `04:06:26`) are not rewritten into summaries (for example `~4h 6m`)
 
 ---
 

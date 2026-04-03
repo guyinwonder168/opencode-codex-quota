@@ -1,3 +1,4 @@
+import type { Part } from "@opencode-ai/sdk";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { QuotaResponse } from "../src/types";
 
@@ -97,9 +98,6 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const expectedCommandTemplate =
-  "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.";
-
 // ─── Plugin export shape ─────────────────────────────────────────────
 
 describe("codexQuotaPlugin — export shape", () => {
@@ -130,13 +128,16 @@ describe("codexQuotaPlugin — export shape", () => {
     expect(typeof hooks.config).toBe("function");
   });
 
-  test("config hook registers /codex_quota command", async () => {
+  test("config hook registers /codex_quota command with empty template", async () => {
     const hooks = await codexQuotaPlugin.server(mockInput);
     expect(hooks.config).toBeDefined();
 
     // Mock opencodeConfig object
     const opencodeConfig: {
-      command?: Record<string, { template: string; description: string }>;
+      command?: Record<
+        string,
+        { template: string; description: string; subtask: boolean }
+      >;
     } = {};
 
     // Call config hook
@@ -144,12 +145,13 @@ describe("codexQuotaPlugin — export shape", () => {
       opencodeConfig,
     );
 
-    // Verify command was registered
+    // Verify command was registered with empty template and subtask execution
     expect(opencodeConfig.command).toBeDefined();
     expect(opencodeConfig.command).toHaveProperty("codex_quota");
     expect(opencodeConfig.command?.codex_quota).toEqual({
-      template: expectedCommandTemplate,
+      template: "",
       description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
+      subtask: true,
     });
   });
 
@@ -158,7 +160,10 @@ describe("codexQuotaPlugin — export shape", () => {
 
     // Mock opencodeConfig with existing command
     const opencodeConfig: {
-      command?: Record<string, { template: string; description: string }>;
+      command?: Record<
+        string,
+        { template: string; description: string; subtask?: boolean }
+      >;
     } = {
       command: {
         existing: { template: "test", description: "Existing command" },
@@ -180,20 +185,174 @@ describe("codexQuotaPlugin — export shape", () => {
     expect(opencodeConfig.command).toHaveProperty("codex_quota");
   });
 
-  test("command template explicitly tells OpenCode to call the codex_quota tool", async () => {
+  test("returns hooks with command.execute.before function", async () => {
     const hooks = await codexQuotaPlugin.server(mockInput);
-    const opencodeConfig: {
-      command?: Record<string, { template: string; description: string }>;
-    } = {};
+    expect(hooks).toHaveProperty("command.execute.before");
+    expect(typeof hooks["command.execute.before"]).toBe("function");
+  });
+});
 
-    await (hooks.config as (cfg: typeof opencodeConfig) => Promise<void>)(
-      opencodeConfig,
-    );
+// ─── Command hook routing ────────────────────────────────────────────
 
-    expect(opencodeConfig.command?.codex_quota.template).toContain(
-      "Call the codex_quota tool now",
+type CommandExecuteBefore = (
+  input: { command: string; sessionID: string; arguments: string },
+  output: { parts: Part[] },
+) => Promise<void>;
+
+async function getCommandHook(): Promise<CommandExecuteBefore> {
+  const hooks = await codexQuotaPlugin.server(mockInput);
+  const hook = hooks["command.execute.before"];
+  expect(hook).toBeDefined();
+  return hook as CommandExecuteBefore;
+}
+
+const textPart = (text: string): Part => ({ type: "text", text }) as Part;
+
+const createCommandOutput = (parts: Part[] = []): { parts: Part[] } => ({
+  parts,
+});
+
+const getText = (part: Part): string => {
+  expect(part.type).toBe("text");
+  return (part as Part & { text: string }).text;
+};
+
+describe("command.execute.before hook", () => {
+  test("compact argument → injects compact-specific instruction", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "compact",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    expect(output.parts).toHaveLength(1);
+    const instruction = getText(output.parts[0]);
+    expect(instruction).toContain(
+      "Call the codex_quota tool now with mode=compact",
     );
-    expect(opencodeConfig.command?.codex_quota.template).toContain("mode=full");
+    expect(instruction).toContain("VERBATIM");
+  });
+
+  test("empty argument → injects full-mode instruction", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    expect(output.parts).toHaveLength(1);
+    const instruction = getText(output.parts[0]);
+    expect(instruction).toContain(
+      "Call the codex_quota tool now with mode=full",
+    );
+    expect(instruction).toContain("VERBATIM");
+  });
+
+  test("full argument → injects full-mode instruction", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "full",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    expect(output.parts).toHaveLength(1);
+    const instruction = getText(output.parts[0]);
+    expect(instruction).toContain(
+      "Call the codex_quota tool now with mode=full",
+    );
+  });
+
+  test("unknown argument → defaults to full-mode instruction", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "unknown_arg",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    expect(output.parts).toHaveLength(1);
+    const instruction = getText(output.parts[0]);
+    expect(instruction).toContain(
+      "Call the codex_quota tool now with mode=full",
+    );
+  });
+
+  test("mixed-case compact → works correctly", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "Compact",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    expect(getText(output.parts[0])).toContain("mode=compact");
+  });
+
+  test("ignores other commands", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "some_other_command" as const,
+      sessionID: "test-session",
+      arguments: "compact",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    // Should not modify output for non-codex_quota commands
+    expect(output.parts).toHaveLength(0);
+  });
+
+  test("clears existing parts before injecting", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "compact",
+    };
+    const output = createCommandOutput([textPart("existing content")]);
+
+    await hook(input, output);
+
+    expect(output.parts).toHaveLength(1);
+    const instruction = getText(output.parts[0]);
+    expect(instruction).not.toContain("existing content");
+    expect(instruction).toContain("mode=compact");
+  });
+
+  test("instruction contains anti-summarization warning", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    const instruction = getText(output.parts[0]);
+    expect(instruction).toContain("Do NOT convert clock times");
+    expect(instruction).toContain("04:06:26");
+    expect(instruction).toContain("~4h 6m");
   });
 });
 

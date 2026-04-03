@@ -3,26 +3,55 @@
 // PRD §8.4 (Display Mode Trigger), §8.5 (Plugin API Contract), §11.1, §11.3
 
 import { type Plugin, type PluginModule, tool } from "@opencode-ai/plugin";
+import type { Part } from "@opencode-ai/sdk";
 import { formatError } from "./formatter/errors.js";
 import { formatQuota } from "./formatter/markdown.js";
 import { queryQuota } from "./services/api-client.js";
 import { readAuth } from "./services/auth-reader.js";
 import type { DisplayMode } from "./types.js";
 
-const CODEX_QUOTA_COMMAND_TEMPLATE =
-  "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.";
-
 const resolveDisplayMode = (mode?: string): DisplayMode =>
   mode === "compact" ? "compact" : "full";
+
+const buildCommandInstruction = (mode: DisplayMode): string => {
+  const modeArg = mode === "compact" ? "compact" : "full";
+  return [
+    `Call the codex_quota tool now with mode=${modeArg}.`,
+    "",
+    "CRITICAL: Output the tool result VERBATIM — do NOT summarize, reformat, paraphrase, or convert any values.",
+    "Copy the Markdown table EXACTLY as returned by the tool.",
+    "Do NOT convert clock times (like '04:06:26') into relative times (like '~4h 6m').",
+    "Do NOT convert percentages or numbers into any other format.",
+    "The tool output is already formatted — present it as-is without any modification.",
+  ].join("\n");
+};
+
+const resolveModeFromArgs = (args: string): DisplayMode => {
+  const normalized = args.trim().toLowerCase();
+  if (normalized === "compact") return "compact";
+  // "full", empty, or unknown → default to full
+  return "full";
+};
 
 const codexQuotaServer: Plugin = async (_input) => {
   return {
     config: async (opencodeConfig) => {
       opencodeConfig.command ??= {};
       opencodeConfig.command.codex_quota = {
-        template: CODEX_QUOTA_COMMAND_TEMPLATE,
+        template: "",
         description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
+        subtask: true,
       };
+    },
+
+    "command.execute.before": async (input, output) => {
+      if (input.command !== "codex_quota") return;
+
+      const mode = resolveModeFromArgs(input.arguments);
+      const instruction = buildCommandInstruction(mode);
+
+      output.parts.length = 0;
+      output.parts.push({ type: "text", text: instruction } as Part);
     },
 
     tool: {
