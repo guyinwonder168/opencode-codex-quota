@@ -1,46 +1,33 @@
 # opencode-codex-quota
 
-[![npm version](https://img.shields.io/npm/v/opencode-codex-quota.svg)](https://www.npmjs.com/package/opencode-codex-quota)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Issues](https://img.shields.io/github/issues/guyinwonder168/opencode-codex-quota.svg)](https://github.com/guyinwonder168/opencode-codex-quota/issues)
-[![CI](https://github.com/guyinwonder168/opencode-codex-quota/actions/workflows/ci.yml/badge.svg)](https://github.com/guyinwonder168/opencode-codex-quota/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 
 OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota** directly in the terminal — no browser needed.
 
 ## Features
 
-- **Single `/codex_quota` command** — one slash command, instant results
+- **Single `/codex_quota` command** — a convenient wrapper that asks OpenCode to call the quota tool
 - **Rich Markdown output** — themed headers, progress bars, tables rendered by OpenCode TUI
-- **5h + Weekly windows** — primary 5-hour and secondary weekly usage with countdown timers
+- **5h + Weekly windows** — primary 5-hour and secondary weekly usage with local reset clocks
 - **Code review quota** — shown when applicable to your plan
 - **Credits & spend control** — balance, approximate message counts, spending status
-- **Warning banners** — proactive alerts at 50%, 80%, and 100% usage
-- **Two display modes** — full (user command) and compact (agent subtask)
+- **Advisory + warning banners** — pacing notes at 50%+, stronger warnings at 80%+, critical at 100%
+- **Two display modes** — full for `/codex_quota`, compact for agent/tool usage or `/codex_quota compact`
 - **Auth from OpenCode** — reads your existing `opencode auth login` credentials, no extra setup
 
 ## Screenshot
 
-*(Coming soon — plugin renders as styled Markdown in OpenCode TUI)*
+![OpenCode TUI screenshot showing the Codex quota report](docs/codex.png)
+
+Example full-mode output rendered in the OpenCode TUI.
 
 ## Install
 
-### Via npm (recommended)
+### Via config file (recommended)
 
-```bash
-npm install -g opencode-codex-quota
-```
-
-Or with your preferred package manager:
-
-```bash
-bun add -g opencode-codex-quota     # Bun
-pnpm add -g opencode-codex-quota    # pnpm
-yarn global add opencode-codex-quota # Yarn
-```
-
-### Via OpenCode config
-
-Add to your OpenCode config (`~/.config/opencode/config.json`):
+Add to your OpenCode config (`~/.config/opencode/config.json` or project `opencode.json`):
 
 ```json
 {
@@ -48,24 +35,16 @@ Add to your OpenCode config (`~/.config/opencode/config.json`):
 }
 ```
 
-OpenCode auto-installs npm plugins at startup using Bun.
-
-### Via OpenCode CLI
-
-```bash
-opencode plugin install opencode-codex-quota
-```
-
 ### From source (development)
 
 ```bash
 git clone https://github.com/guyinwonder168/opencode-codex-quota.git
 cd opencode-codex-quota
-bun install
-bun run build
+npm install
+npm run build
 ```
 
-Then add the local path to your config:
+Then point OpenCode at your local package directory:
 
 ```json
 {
@@ -73,17 +52,39 @@ Then add the local path to your config:
 }
 ```
 
+This project is packaged as an npm/path plugin. OpenCode also supports raw local plugin files placed directly in `.opencode/plugins/` or `~/.config/opencode/plugins/`, but that is a different layout from this repository.
+
+## How `/codex_quota` works
+
+In current OpenCode plugin APIs:
+
+- the `codex_quota` **tool** is exposed to the agent/tool loop
+- the `/codex_quota` **slash command** is a wrapper prompt that tells OpenCode to call that tool
+
+That means `/codex_quota` is convenient and reliable, but it is still **LLM-mediated**, not a direct no-LLM syscall.
+
 ## Usage
 
-### User Command (Full Mode)
+### Wrapper Command (Full Mode)
 
 ```
 /codex_quota
 ```
 
-Displays complete quota information:
+Shows complete quota details: plan type, primary 5h window, weekly window,
+code review quota, credits, spend control, and promotional info.
+
+Under the hood, the wrapper prompt asks OpenCode to call the `codex_quota` tool and present the result.
+
+You can also pass `compact` to the slash command when you want the shorter table:
 
 ```
+/codex_quota compact
+```
+
+**Example output:**
+
+```markdown
 # OpenAI Codex Subscription
 
 **Plan:** Plus | **Account:** user@example.com
@@ -92,10 +93,22 @@ Displays complete quota information:
 
 ## Quota Limits
 
-| Window | Usage | Progress | Resets In |
-|--------|-------|----------|-----------|
-| **Primary (5h)** | 25% | `███░░░░░░░░░` 25% | 1h 30m |
-| **Weekly** | 16% | `██░░░░░░░░░░` 16% | 5d 12h |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| **Primary (5h)** | 51% | `██████░░░░░░` 51% | 04:06:26 |
+| **Weekly** | 40% | `█████░░░░░░░` 40% | 05:46:54 on 9 Apr |
+
+---
+
+> ⚠️ Primary (5h) at 51% — consider pacing your usage.
+
+---
+
+## Code Review Quota
+
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| **Weekly** | 0% | `░░░░░░░░░░░░` 0% | 02:37:12 on 11 Apr |
 
 ---
 
@@ -108,21 +121,25 @@ Displays complete quota information:
 *Updated: 2026-03-29T12:00:00.000Z*
 ```
 
-### Agent Subtask (Compact Mode)
+### Agent / Tool Call (Compact Mode)
 
-The tool can be called by AI agents with `mode=compact` for concise output:
-
-```
-/codex_quota mode=compact
-```
+The underlying tool supports `mode=compact` for concise output when called by an AI agent:
 
 ```
+codex_quota(mode="compact")
+```
+
+**Example output:**
+
+```markdown
 ### Codex Quota — Plus
 
-| Window | Usage | Progress | Reset |
-|--------|-------|----------|-------|
-| 5h | 25% | `███░░░░░░░░░` | 1h 30m |
-| Weekly | 16% | `██░░░░░░░░░░` | 5d 12h |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| 5h | 51% | `██████░░░░░░` | 04:06:26 |
+| Weekly | 40% | `█████░░░░░░░` | 05:46:54 on 9 Apr |
+
+**Status**: ✅ Within limits
 ```
 
 ### Conditional Sections
@@ -134,7 +151,7 @@ Some sections appear only when relevant:
 | **Code Review Quota** | When your plan includes code review limits |
 | **Credits** | When you have credits or unlimited balance |
 | **Promotional** | When promotional quota is active |
-| **Warning banners** | When any window exceeds 80% |
+| **Warning banners** | When any window is 80–99% or 100% |
 | **Advisory notes** | When any window is 50–79% |
 
 ## Requirements
@@ -145,18 +162,19 @@ Some sections appear only when relevant:
 
 ## Error Handling
 
-The plugin shows clear, actionable Markdown messages for common issues:
+The plugin shows user-friendly Markdown messages for common issues:
 
 | Error | Message |
 |-------|---------|
-| No auth file | Setup instructions with `opencode auth login` steps |
-| No OpenAI credentials | Lists provider keys checked, re-auth guidance |
+| Missing auth | Setup instructions with `opencode auth login` steps |
+| Wrong auth type | OAuth setup instructions |
+| Empty token | Re-auth instruction |
 | Token expired | Re-auth instruction |
-| Network timeout | Connection check guidance |
+| Network error | Connection check guidance |
 | API 401/403 | Token refresh instruction |
 | API 429 | Rate limited — wait a few seconds |
 | API 5xx | Service unavailable — try later |
-| Unexpected API response | Partial data with update notice |
+| Unexpected response | Partial data with update notice |
 
 ## Architecture
 
@@ -176,13 +194,15 @@ opencode-codex-quota/
     ├── api-client.test.ts
     ├── markdown.test.ts
     ├── errors.test.ts
+    ├── index.test.ts
     └── integration.test.ts
 ```
 
 **Data flow:**
 
 ```
-/codex_quota [mode?]
+/codex_quota
+  → wrapper prompt tells OpenCode to call tool.codex_quota
   → AuthReader: auth.json → JWT → { token, accountId, email }
   → ApiClient: GET wham/usage → QuotaResponse
   → Formatter: QuotaResponse + mode → Markdown string
@@ -193,7 +213,7 @@ opencode-codex-quota/
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) >= 1.2.0
+- [Node.js](https://nodejs.org) >= 18
 - TypeScript >= 5.7
 
 ### Setup
@@ -201,26 +221,28 @@ opencode-codex-quota/
 ```bash
 git clone https://github.com/guyinwonder168/opencode-codex-quota.git
 cd opencode-codex-quota
-bun install
+npm install
 ```
 
 ### Commands
 
 ```bash
-bun run build       # TypeScript → dist/
-bun run typecheck   # Type checking only
-bun test            # Run all tests
-bun test --watch    # Run tests in watch mode
+npm run build         # TypeScript → dist/
+npm run typecheck     # Type checking only
+npm test              # Run all tests
+npm run test:coverage # Run tests with coverage
+npm run lint          # Check code style
+npm run lint:fix      # Fix code style issues
 ```
 
 ### Testing
 
-Tests use `bun test` with the Arrange-Act-Assert pattern. Mocks for `fetch` and `fs` are set up per test.
+Tests use `vitest` with the Arrange-Act-Assert pattern. Mocks for `fetch` and `fs` are set up per test.
 
 ```bash
-bun test                              # All tests
-bun test tests/auth-reader.test.ts    # Specific file
-bun test --coverage                   # With coverage report
+npm test                                   # All tests
+npm test -- tests/auth-reader.test.ts      # Specific file
+npm run test:coverage                      # With coverage report
 ```
 
 ## Contributing

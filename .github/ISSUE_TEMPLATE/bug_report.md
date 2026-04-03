@@ -29,7 +29,8 @@ What actually happened (including any error output).
 - **Plugin version**: 
 - **Subscription plan**: Plus / Pro
 - **OS**: 
-- **Bun version**: `bun --version`
+- **Node.js version**: `node --version`
+- **npm version**: `npm --version`
 
 ## Additional Context
 

@@ -7,9 +7,9 @@ Thank you for your interest in contributing! This document covers everything you
 ```bash
 git clone https://github.com/guyinwonder168/opencode-codex-quota.git
 cd opencode-codex-quota
-bun install
-bun test          # Verify everything works
-bun run build     # Build the project
+npm install
+npm test              # Verify everything works
+npm run build         # Build the project
 ```
 
 ## Development Workflow
@@ -18,7 +18,7 @@ bun run build     # Build the project
 2. **Create a branch** from `main`: `git checkout -b feat/your-feature`
 3. **Write tests first** (TDD: RED → GREEN → REFACTOR)
 4. **Implement** the minimal code to pass tests
-5. **Run checks**: `bun test && bun run typecheck`
+5. **Run checks**: `npm test && npm run typecheck && npm run lint`
 6. **Commit** with conventional commit messages
 7. **Push** and open a Pull Request
 
@@ -40,15 +40,15 @@ chore: update dependencies
 - **TypeScript strict mode** — no `any`, no `@ts-ignore`
 - **Functional patterns** — prefer pure functions, avoid classes
 - **No console.log in production code** — only in tests
-- **Named exports** — no default exports except the plugin entry point
+- **Exports** — prefer named exports in regular modules; use the modern default export object for the plugin entry point
 - **File structure**: one component per file, tests mirror source structure
 
 ### Formatting
 
-- 2-space indentation
-- Single quotes for strings
-- Trailing commas in multi-line structures
-- Max line length: 100 characters (guideline, not enforced)
+- Match the existing style in touched files
+- Let Biome output be the source of truth for lint/style issues
+- Prefer small, surgical diffs over broad formatting churn
+- Keep line lengths readable; avoid unnecessary wrapping churn
 
 ## Testing
 
@@ -63,10 +63,10 @@ chore: update dependencies
 ### Running Tests
 
 ```bash
-bun test                              # All tests
-bun test tests/auth-reader.test.ts    # Single file
-bun test --watch                      # Watch mode
-bun test --coverage                   # With coverage
+npm test                                   # All tests
+npm test -- tests/auth-reader.test.ts      # Single file
+npx vitest                                 # Watch mode
+npm run test:coverage                      # With coverage
 ```
 
 ### Test File Convention
@@ -105,12 +105,13 @@ These are hard constraints — PRs violating them will be rejected:
 
 ## Pull Request Process
 
-1. Ensure all tests pass: `bun test`
-2. Ensure type checking passes: `bun run typecheck`
-3. Ensure build succeeds: `bun run build`
-4. Update documentation if needed
-5. Add entries to CHANGELOG.md under `[Unreleased]`
-6. Reference any related issues: `Fixes #123`
+1. Ensure all tests pass: `npm test`
+2. Ensure type checking passes: `npm run typecheck`
+3. Ensure lint passes: `npm run lint`
+4. Ensure build succeeds: `npm run build`
+5. Update documentation if needed
+6. Add entries to CHANGELOG.md under `[Unreleased]`
+7. Reference any related issues: `Fixes #123`
 
 ### PR Template
 
