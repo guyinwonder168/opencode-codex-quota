@@ -1,8 +1,15 @@
 # opencode-codex-quota
 
+[![npm](https://img.shields.io/npm/v/opencode-codex-quota.svg)](https://www.npmjs.com/package/opencode-codex-quota)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Issues](https://img.shields.io/github/issues/guyinwonder168/opencode-codex-quota.svg)](https://github.com/guyinwonder168/opencode-codex-quota/issues)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-codex-quota)
+---
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-codex-quota&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-codex-quota)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-codex-quota&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-codex-quota)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-codex-quota&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-codex-quota)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=guyinwonder168_opencode-codex-quota&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=guyinwonder168_opencode-codex-quota)
 
 OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota** directly in the terminal — no browser needed.
 
