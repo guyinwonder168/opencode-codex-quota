@@ -187,10 +187,12 @@ function formatCompact(response: QuotaResponse): string {
   const lines: string[] = [];
 
   const planDisplay = capitalize(response.plan_type);
-  lines.push(`### Codex Quota — ${planDisplay}`);
-  lines.push("");
-  lines.push("| Window | Usage | Progress | Resets At |");
-  lines.push("|--------|-------|----------|------------|");
+  lines.push(
+    `### Codex Quota — ${planDisplay}`,
+    "",
+    "| Window | Usage | Progress | Resets At |",
+    "|--------|-------|----------|------------|",
+  );
 
   if (response.rate_limit.primary_window) {
     const w = response.rate_limit.primary_window;

@@ -38,7 +38,7 @@ export function parseJwt(token: string): {
   let payload: JwtClaims;
   try {
     // Convert base64url → standard base64
-    let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    let base64 = parts[1].replaceAll("-", "+").replaceAll("_", "/");
     // Pad to a multiple of 4
     while (base64.length % 4 !== 0) {
       base64 += "=";

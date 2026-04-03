@@ -43,7 +43,7 @@ export interface QuotaResponse {
   // === OPTIONAL fields (gracefully handled if missing) ===
   code_review_rate_limit?: RateLimitInfo; // OPTIONAL — may be absent
   additional_rate_limits?: unknown; // OPTIONAL — ignored in v1.0 display
-  promo?: unknown | null; // OPTIONAL — displayed when non-null
+  promo?: unknown; // OPTIONAL — displayed when non-null
 }
 
 export type DisplayMode = "compact" | "full";
