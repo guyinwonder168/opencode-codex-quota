@@ -33,8 +33,8 @@ ChatGPT Plus/Pro subscribers using OpenCode with Codex have **no visibility** in
 |---|-------------|----------|
 | F1 | Single `/codex_quota` command | P0 |
 | F2 | Display subscription tier (Plus/Pro) | P0 |
-| F3 | Display primary window (5h) quota with progress bar, %, reset countdown | P0 |
-| F4 | Display secondary window (weekly) quota with progress bar, %, reset countdown | P0 |
+| F3 | Display primary window (5h) quota with progress bar, %, reset clock time | P0 |
+| F4 | Display secondary window (weekly) quota with progress bar, %, reset clock time | P0 |
 | F5 | Display code review quota when present | P1 |
 | F6 | Display credits + approximate message counts when applicable | P1 |
 | F7 | Display promotional quota info when present | P1 |
@@ -70,7 +70,7 @@ ChatGPT Plus/Pro subscribers using OpenCode with Codex have **no visibility** in
 - Credits with approximate message counts
 - Promotional quota info
 - Spend control status
-- Reset time countdowns
+- Reset clock times (local time)
 - Warning banners on limit reached
 - Subscription tier display
 - Compact (agent) + full (user) display modes
@@ -221,8 +221,8 @@ export interface AuthInfo {
 export interface WindowInfo {
   used_percent: number          // 0–100 (may exceed 100 from API — clamp to 100 for display)
   limit_window_seconds: number  // Window duration in seconds (e.g., 18000 = 5h)
-  reset_after_seconds: number   // Seconds until reset
-  reset_at: number              // Unix timestamp in SECONDS for when the window resets
+  reset_after_seconds: number   // Seconds until reset (kept for fallback/internal calculations)
+  reset_at: number              // Unix timestamp in SECONDS for the local reset clock display
 }
 
 export interface RateLimitInfo {
@@ -278,21 +278,21 @@ export type DisplayMode = "compact" | "full"
   - 80–99%: Warning banner (blockquote with ⚠️)
   - 100%: Limit reached banner (blockquote with 🚫)
 
-### 8.3 Time Formatting Specification
+### 8.3 Reset Clock Formatting Specification
 
-Convert seconds to human-readable string:
+Display `reset_at` as a local clock string:
 
-| Seconds | Output |
-|---------|--------|
-| 0 | `now` |
-| < 60 | `{s}s` |
-| < 3600 | `{m}m {s}s` |
-| < 86400 | `{h}h {m}m` |
-| ≥ 86400 | `{d}d {h}h` |
+| Case | Output |
+|------|--------|
+| Same-day reset | `HH:mm:ss` |
+| Reset on a different day | `HH:mm:ss on D MMM` |
 
-- Floor all divisions (no decimals)
-- Use remainder for next smaller unit
-- Example: `90061s` → `1d 1h`
+- Use the user's local timezone
+- Use 24-hour time with zero-padded hour, minute, and second
+- `reset_after_seconds` remains available for fallback/internal calculations; normal display is driven by `reset_at`
+- Weekly resets should append the date suffix when needed for clarity
+- Example: primary reset `04:06:00`
+- Example: weekly reset `05:46:00 on 9 Apr`
 
 ### 8.4 Display Mode Trigger
 
@@ -389,10 +389,10 @@ export default {
 ```markdown
 ### Codex Quota — {Plan}
 
-| Window | Usage | Progress | Reset |
-|--------|-------|----------|-------|
-| 5h | {percent}% | `{bar}` | {time} |
-| Weekly | {percent}% | `{bar}` | {time} |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| 5h | {percent}% | `{bar}` | {clock} |
+| Weekly | {percent}% | `{bar}` | {clock} |
 
 **Status**: {✅ Within limits | ⚠️ {percent}% used | 🚫 Limit reached}
 ```
@@ -414,10 +414,10 @@ export default {
 
 ## Quota Limits
 
-| Window | Usage | Progress | Resets In |
-|--------|-------|----------|-----------|
-| **Primary (5h)** | {percent}% | `{bar}` {percent}% | {time} |
-| **Weekly** | {percent}% | `{bar}` {percent}% | {time} |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| **Primary (5h)** | {percent}% | `{bar}` {percent}% | {clock} |
+| **Weekly** | {percent}% | `{bar}` {percent}% | {clock} |
 
 > ⚠️ {window name} at {percent}% — {advisory text}
 
@@ -427,9 +427,9 @@ export default {
 
 *(only shown when `code_review_rate_limit.primary_window` is not null)*
 
-| Window | Usage | Progress | Resets In |
-|--------|-------|----------|-----------|
-| **Weekly** | {percent}% | `{bar}` {percent}% | {time} |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| **Weekly** | {percent}% | `{bar}` {percent}% | {clock} |
 
 ---
 

@@ -919,7 +919,7 @@ After spec compliance review (PASS), a code quality review identified 4 issues t
 - Modify: `src/formatter/markdown.ts`
 - Create: `tests/markdown.test.ts`
 
-**Reference:** PRD 8.2 (Progress Bar with clamping), 8.3 (Time Formatting), 9.1–9.5 (Output Spec), 9.2 (Compact mode), 9.3 (Full mode), 9.4 (Conditional Sections), 9.5 (Edge Cases)
+**Reference:** PRD 8.2 (Progress Bar with clamping), 8.3 (Reset Clock Formatting Specification), 9.1–9.5 (Output Spec), 9.2 (Compact mode), 9.3 (Full mode), 9.4 (Conditional Sections), 9.5 (Edge Cases)
 
 **Step 1: Write failing tests for Formatter**
 
@@ -927,7 +927,7 @@ After spec compliance review (PASS), a code quality review identified 4 issues t
 
 ```typescript
 import { describe, test, expect } from "vitest"
-import { formatQuota, buildProgressBar, formatTime } from "../src/formatter/markdown"
+import { formatQuota, buildProgressBar, formatResetClock } from "../src/formatter/markdown"
 import type { QuotaResponse } from "../src/types"
 
 // Helper to create a base response for tests
@@ -997,30 +997,18 @@ describe("buildProgressBar", () => {
   })
 })
 
-// === formatTime ===
-describe("formatTime", () => {
-  test("0 seconds → now", () => {
-    expect(formatTime(0)).toBe("now")
+// === formatResetClock ===
+describe("formatResetClock", () => {
+  test("same-day reset → HH:mm:ss", () => {
+    const referenceDate = new Date("2025-04-08T12:00:00")
+    const sameDayReset = Math.floor(new Date("2025-04-08T04:06:00").getTime() / 1000)
+    expect(formatResetClock(sameDayReset, referenceDate)).toBe("04:06:00")
   })
 
-  test("45 seconds → 45s", () => {
-    expect(formatTime(45)).toBe("45s")
-  })
-
-  test("125 seconds → 2m 5s", () => {
-    expect(formatTime(125)).toBe("2m 5s")
-  })
-
-  test("3600 seconds → 1h 0m", () => {
-    expect(formatTime(3600)).toBe("1h 0m")
-  })
-
-  test("90061 seconds → 1d 1h", () => {
-    expect(formatTime(90061)).toBe("1d 1h")
-  })
-
-  test("86400 seconds → 1d 0h", () => {
-    expect(formatTime(86400)).toBe("1d 0h")
+  test("different-day reset → HH:mm:ss on D MMM", () => {
+    const referenceDate = new Date("2025-04-08T12:00:00")
+    const nextDayReset = Math.floor(new Date("2025-04-09T05:46:00").getTime() / 1000)
+    expect(formatResetClock(nextDayReset, referenceDate)).toBe("05:46:00 on 9 Apr")
   })
 })
 
@@ -1037,12 +1025,15 @@ describe("formatQuota — full mode", () => {
     expect(result).toContain("**Primary (5h)**")
     expect(result).toContain("25%")
     expect(result).toContain("███░░░░░░░░░")
+    expect(result).toContain("Resets At")
+    expect(result).not.toContain("Resets In")
   })
 
   test("includes secondary window when present", () => {
     const result = formatQuota(createBaseResponse(), "full")
     expect(result).toContain("**Weekly**")
     expect(result).toContain("16%")
+    expect(result).toContain("Resets At")
   })
 
   test("skips secondary window row when null", () => {
@@ -1058,7 +1049,7 @@ describe("formatQuota — full mode", () => {
     expect(result).not.toContain("**Weekly**")
   })
 
-  test("shows code review section when primary_window is not null", () => {
+  test("shows code review section with clock-style reset time", () => {
     const withCodeReview = createBaseResponse({
       code_review_rate_limit: {
         allowed: true,
@@ -1069,6 +1060,8 @@ describe("formatQuota — full mode", () => {
     })
     const result = formatQuota(withCodeReview, "full")
     expect(result).toContain("## Code Review Quota")
+    expect(result).toContain("Resets At")
+    expect(result).not.toContain("Resets In")
   })
 
   test("hides code review section when primary_window is null", () => {
@@ -1207,6 +1200,8 @@ describe("formatQuota — compact mode", () => {
     const result = formatQuota(createBaseResponse(), "compact")
     expect(result).toContain("| 5h |")
     expect(result).toContain("| Weekly |")
+    expect(result).toContain("Resets At")
+    expect(result).not.toContain("Reset |")
   })
 
   test("does NOT show code review, credits, spend control, promo", () => {
@@ -1278,20 +1273,28 @@ export function buildProgressBar(usedPercent: number): string {
 }
 
 /**
- * Format seconds to human-readable string. PRD 8.3.
+ * Format reset_at as a local clock string. PRD 8.3.
  */
-export function formatTime(seconds: number): string {
-  if (seconds <= 0) return "now"
+export function formatResetClock(resetAt: number, referenceDate = new Date()): string {
+  const date = new Date(resetAt * 1000)
 
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date)
 
-  if (d > 0) return `${d}d ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  if (m > 0) return `${m}m ${s}s`
-  return `${s}s`
+  const sameDay =
+    date.getFullYear() === referenceDate.getFullYear() &&
+    date.getMonth() === referenceDate.getMonth() &&
+    date.getDate() === referenceDate.getDate()
+
+  if (sameDay) return time
+
+  const day = new Intl.DateTimeFormat(undefined, { day: "numeric" }).format(date)
+  const month = new Intl.DateTimeFormat(undefined, { month: "short" }).format(date)
+  return `${time} on ${day} ${month}`
 }
 
 function capitalize(s: string): string {
@@ -1307,8 +1310,8 @@ function formatMessageRange(range: [number, number]): string {
 function windowRow(label: string, window: WindowInfo | null): string {
   if (!window) return `| **${label}** | N/A | N/A | N/A |`
   const bar = buildProgressBar(window.used_percent)
-  const time = formatTime(window.reset_after_seconds)
-  return `| **${label}** | ${window.used_percent}% | \`${bar}\` ${window.used_percent}% | ${time} |`
+  const clock = formatResetClock(window.reset_at)
+  return `| **${label}** | ${window.used_percent}% | \`${bar}\` ${window.used_percent}% | ${clock} |`
 }
 
 type WarningLevel = "none" | "advisory" | "warning" | "critical"
@@ -1348,7 +1351,7 @@ function formatWarnings(response: QuotaResponse): string {
   for (const { name, window } of windows) {
     if (!window) continue
     if (window.used_percent >= 100) {
-      lines.push(`> 🚫 ${name} — limit reached. Resets in ${formatTime(window.reset_after_seconds)}.`)
+      lines.push(`> 🚫 ${name} — limit reached. Resets at ${formatResetClock(window.reset_at)}.`)
     } else if (window.used_percent >= 80) {
       lines.push(`> ⚠️ ${name} at ${window.used_percent}% — approaching limit.`)
     }
@@ -1375,7 +1378,7 @@ function formatFull(response: QuotaResponse): string {
   )
 
   // Quota Limits (always shown)
-  let quotaTable = `## Quota Limits\n\n| Window | Usage | Progress | Resets In |\n|--------|-------|----------|-----------|`
+  let quotaTable = `## Quota Limits\n\n| Window | Usage | Progress | Resets At |\n|--------|-------|----------|------------|`
 
   if (response.rate_limit.primary_window) {
     quotaTable += `\n${windowRow("Primary (5h)", response.rate_limit.primary_window)}`
@@ -1397,7 +1400,7 @@ function formatFull(response: QuotaResponse): string {
 
   // Code Review Quota — only when primary_window is not null (9.4)
   if (response.code_review_rate_limit?.primary_window) {
-    const crTable = `## Code Review Quota\n\n| Window | Usage | Progress | Resets In |\n|--------|-------|----------|-----------|\n${windowRow("Weekly", response.code_review_rate_limit.primary_window)}`
+    const crTable = `## Code Review Quota\n\n| Window | Usage | Progress | Resets At |\n|--------|-------|----------|------------|\n${windowRow("Weekly", response.code_review_rate_limit.primary_window)}`
     sections.push(crTable)
   }
 
@@ -1431,21 +1434,21 @@ function formatCompact(response: QuotaResponse): string {
   const planDisplay = capitalize(response.plan_type)
   lines.push(`### Codex Quota — ${planDisplay}`)
   lines.push("")
-  lines.push("| Window | Usage | Progress | Reset |")
-  lines.push("|--------|-------|----------|-------|")
+  lines.push("| Window | Usage | Progress | Resets At |")
+  lines.push("|--------|-------|----------|------------|")
 
   if (response.rate_limit.primary_window) {
     const w = response.rate_limit.primary_window
     const bar = buildProgressBar(w.used_percent)
-    const time = formatTime(w.reset_after_seconds)
-    lines.push(`| 5h | ${w.used_percent}% | \`${bar}\` | ${time} |`)
+    const clock = formatResetClock(w.reset_at)
+    lines.push(`| 5h | ${w.used_percent}% | \`${bar}\` | ${clock} |`)
   }
 
   if (response.rate_limit.secondary_window) {
     const w = response.rate_limit.secondary_window
     const bar = buildProgressBar(w.used_percent)
-    const time = formatTime(w.reset_after_seconds)
-    lines.push(`| Weekly | ${w.used_percent}% | \`${bar}\` | ${time} |`)
+    const clock = formatResetClock(w.reset_at)
+    lines.push(`| Weekly | ${w.used_percent}% | \`${bar}\` | ${clock} |`)
   }
 
   // Compact status — most severe wins (PRD 9.2: 🚫 > ⚠️ > ✅)
@@ -1484,7 +1487,7 @@ Expected: ALL PASS
 
 ```bash
 git add src/formatter/markdown.ts tests/markdown.test.ts
-git commit -m "feat: Formatter — Markdown output with compact/full modes, progress bars, time formatting"
+ git commit -m "feat: Formatter — Markdown output with compact/full modes, progress bars, clock formatting"
 ```
 
 ---
