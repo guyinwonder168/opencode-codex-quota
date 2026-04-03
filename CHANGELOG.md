@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-04-04
+
 ### Added
 - Initial plugin implementation
 - `/codex_quota` slash command wrapper with full and compact display modes
@@ -14,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API client for `chatgpt.com/backend-api/wham/usage` endpoint
 - Markdown formatter with progress bars, time formatting, conditional sections
 - Error handling for E1–E9 scenarios
-- Full Vitest test suite
-- CI workflow for test + typecheck + build
+- Full Vitest test suite (124 tests, 99%+ coverage)
+- CI workflow for test + typecheck + build + SonarCloud analysis
+- Publish-to-npm workflow triggered on GitHub Release with provenance
 - README screenshot showing OpenCode TUI output
 
 ### Changed
@@ -25,3 +28,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Mark the injected `/codex_quota` wrapper instruction text as synthetic for OpenCode TUI prompt reconstruction actions
+- SonarCloud maintainability: extract helper functions to reduce cognitive complexity, consolidate consecutive statements, replace negated conditionals

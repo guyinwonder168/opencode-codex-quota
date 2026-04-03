@@ -1,5 +1,6 @@
 # opencode-codex-quota
 
+[![npm](https://img.shields.io/npm/v/opencode-codex-quota.svg)](https://www.npmjs.com/package/opencode-codex-quota)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub Issues](https://img.shields.io/github/issues/guyinwonder168/opencode-codex-quota.svg)](https://github.com/guyinwonder168/opencode-codex-quota/issues)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
