@@ -12,9 +12,10 @@ How was this implemented? Key architectural decisions.
 
 ## Testing
 
-- [ ] All tests pass (`bun test`)
-- [ ] Type checking passes (`bun run typecheck`)
-- [ ] Build succeeds (`bun run build`)
+- [ ] All tests pass (`npm test`)
+- [ ] Type checking passes (`npm run typecheck`)
+- [ ] Lint passes (`npm run lint`)
+- [ ] Build succeeds (`npm run build`)
 - [ ] New tests added for new functionality
 
 ## Checklist

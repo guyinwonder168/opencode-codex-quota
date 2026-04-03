@@ -6,9 +6,11 @@
 
 **Architecture:** Component-Service pattern — `AuthReader` reads `~/.local/share/opencode/auth.json`, parses JWT for account_id + email. `ApiClient` calls `chatgpt.com/backend-api/wham/usage` with OAuth token. `Formatter` transforms the typed response into raw Markdown string. Plugin entry point wires them together as a single tool.
 
-**Tech Stack:** TypeScript (strict), Bun runtime, `bun test`, `@opencode-ai/plugin` SDK (Zod-based `tool.schema`), zero runtime dependencies beyond the SDK.
+**Tech Stack:** TypeScript (strict), Node.js runtime, npm scripts + Vitest, `@opencode-ai/plugin` SDK (Zod-based `tool.schema`), zero runtime dependencies beyond the SDK.
 
 **PRD:** `docs/codex-quota-prd.md` — authoritative source for all requirements, types, API spec, error scenarios, output format.
+
+> Historical note: this plan originally used Bun-based commands. The examples below now use the repo's current npm/Vitest workflow for easier reuse.
 
 ---
 
@@ -30,7 +32,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "bun test",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -39,8 +41,8 @@
   "devDependencies": {
     "@opencode-ai/plugin": "^1.3.5",
     "typescript": "^5.7.0",
-    "@types/bun": "^1.2.0",
-    "bun-types": "^1.2.0"
+    "@types/node": "^22.0.0",
+    "vitest": "^3.0.0"
   },
   "keywords": ["opencode", "plugin", "codex", "quota", "chatgpt"],
   "license": "MIT"
@@ -56,7 +58,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
-    "types": ["bun-types"],
+    "types": ["node"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -84,12 +86,12 @@ dist/
 
 **Step 4: Install dependencies**
 
-Run: `bun install`
+Run: `npm install`
 Expected: `node_modules/` created, lock file generated
 
 **Step 5: Verify TypeScript compiles (empty project)**
 
-Run: `bun run typecheck`
+Run: `npm run typecheck`
 Expected: PASS (no source files yet, but config is valid)
 
 **Step 6: Commit**
@@ -97,7 +99,7 @@ Expected: PASS (no source files yet, but config is valid)
 ```bash
 git init
 git add package.json tsconfig.json .gitignore
-git commit -m "chore: project scaffolding with bun + typescript config"
+git commit -m "chore: project scaffolding with npm + typescript config"
 ```
 
 ---
@@ -184,7 +186,7 @@ mkdir -p src/services src/formatter
 
 **Step 3: Verify types compile**
 
-Run: `bun run typecheck`
+Run: `npm run typecheck`
 Expected: PASS
 
 **Step 4: Commit**
@@ -209,7 +211,7 @@ git commit -m "feat: add TypeScript type definitions for API + auth"
 `tests/auth-reader.test.ts`:
 
 ```typescript
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach } from "vitest"
 import { mkdir, writeFile, rm } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
@@ -395,7 +397,7 @@ describe("readAuth", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `bun test tests/auth-reader.test.ts`
+Run: `npm test -- tests/auth-reader.test.ts`
 Expected: FAIL — `parseJwt` and `readAuth` don't exist yet
 
 **Step 3: Implement AuthReader**
@@ -508,7 +510,7 @@ export async function readAuth(authFilePath: string): Promise<AuthResult> {
 
 **Step 4: Run tests to verify they pass**
 
-Run: `bun test tests/auth-reader.test.ts`
+Run: `npm test -- tests/auth-reader.test.ts`
 Expected: ALL PASS
 
 **Step 5: Commit**
@@ -533,11 +535,11 @@ git commit -m "feat: AuthReader service — read auth.json, parse JWT, extract a
 `tests/api-client.test.ts`:
 
 ```typescript
-import { describe, test, expect } from "bun:test"
+import { afterEach, describe, expect, test } from "vitest"
 import { queryQuota } from "../src/services/api-client"
 import type { QuotaResponse } from "../src/types"
 
-// We mock fetch via Bun's global fetch override
+// We mock fetch via the global fetch override
 describe("queryQuota", () => {
   const originalFetch = globalThis.fetch
 
@@ -692,11 +694,11 @@ describe("queryQuota", () => {
 })
 ```
 
-> Note: Add `import { afterEach } from "bun:test"` at the top if not already imported.
+> Note: Add `import { afterEach } from "vitest"` at the top if not already imported.
 
 **Step 2: Run tests to verify they fail**
 
-Run: `bun test tests/api-client.test.ts`
+Run: `npm test -- tests/api-client.test.ts`
 Expected: FAIL — `queryQuota` doesn't exist yet
 
 **Step 3: Implement ApiClient**
@@ -775,12 +777,12 @@ export async function queryQuota(token: string, accountId: string): Promise<ApiR
 
 **Step 4: Run tests to verify they pass**
 
-Run: `bun test tests/api-client.test.ts`
+Run: `npm test -- tests/api-client.test.ts`
 Expected: ALL PASS
 
 **Step 5: Run all tests**
 
-Run: `bun test`
+Run: `npm test`
 Expected: ALL PASS (auth-reader + api-client)
 
 **Step 6: Commit**
@@ -805,7 +807,7 @@ git commit -m "feat: ApiClient service — query wham/usage endpoint with timeou
 `tests/markdown.test.ts`:
 
 ```typescript
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "vitest"
 import { formatQuota, buildProgressBar, formatTime } from "../src/formatter/markdown"
 import type { QuotaResponse, DisplayMode } from "../src/types"
 
@@ -1222,7 +1224,7 @@ function createBaseResponse(): QuotaResponse {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `bun test tests/markdown.test.ts`
+Run: `npm test -- tests/markdown.test.ts`
 Expected: FAIL — functions don't exist yet
 
 **Step 3: Implement Formatter**
@@ -1427,12 +1429,12 @@ export function formatQuota(response: QuotaResponse, mode: DisplayMode): string 
 
 **Step 4: Run tests to verify they pass**
 
-Run: `bun test tests/markdown.test.ts`
+Run: `npm test -- tests/markdown.test.ts`
 Expected: ALL PASS (some tests may need minor adjustments — fix them)
 
 **Step 5: Run all tests**
 
-Run: `bun test`
+Run: `npm test`
 Expected: ALL PASS
 
 **Step 6: Commit**
@@ -1457,7 +1459,7 @@ git commit -m "feat: Formatter — Markdown output with compact/full modes, prog
 `tests/errors.test.ts`:
 
 ```typescript
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect } from "vitest"
 import { formatError } from "../src/formatter/errors"
 
 describe("formatError", () => {
@@ -1536,7 +1538,7 @@ describe("formatError", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `bun test tests/errors.test.ts`
+Run: `npm test -- tests/errors.test.ts`
 Expected: FAIL — `formatError` doesn't exist yet
 
 **Step 3: Implement error formatter**
@@ -1639,7 +1641,7 @@ export function formatError(code: string, partialData?: unknown): string {
 
 **Step 4: Run tests to verify they pass**
 
-Run: `bun test tests/errors.test.ts`
+Run: `npm test -- tests/errors.test.ts`
 Expected: ALL PASS
 
 **Step 5: Commit**
@@ -1719,12 +1721,12 @@ export default CodexQuotaPlugin
 
 **Step 2: Verify TypeScript compiles**
 
-Run: `bun run typecheck`
+Run: `npm run typecheck`
 Expected: PASS (may need to fix any import issues)
 
 **Step 3: Build**
 
-Run: `bun run build`
+Run: `npm run build`
 Expected: `dist/` directory created with compiled JS + `.d.ts` files
 
 **Step 4: Commit**
@@ -1748,7 +1750,7 @@ git commit -m "feat: plugin entry point — codex_quota tool with compact/full m
 `tests/integration.test.ts`:
 
 ```typescript
-import { describe, test, expect, afterEach } from "bun:test"
+import { describe, test, expect, afterEach } from "vitest"
 import { mkdir, writeFile, rm } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
@@ -1947,12 +1949,12 @@ describe("Integration — full pipeline", () => {
 
 **Step 2: Run integration tests**
 
-Run: `bun test tests/integration.test.ts`
+Run: `npm test -- tests/integration.test.ts`
 Expected: ALL PASS
 
 **Step 3: Run ALL tests**
 
-Run: `bun test`
+Run: `npm test`
 Expected: ALL PASS (auth-reader + api-client + markdown + errors + integration)
 
 **Step 4: Commit**
@@ -1971,17 +1973,17 @@ git commit -m "test: integration tests — full pipeline from auth through API t
 
 **Step 1: Run full test suite**
 
-Run: `bun test`
+Run: `npm test`
 Expected: ALL tests pass, 0 failures
 
 **Step 2: Run TypeScript type check**
 
-Run: `bun run typecheck`
+Run: `npm run typecheck`
 Expected: 0 errors
 
 **Step 3: Build the plugin**
 
-Run: `bun run build`
+Run: `npm run build`
 Expected: `dist/` created with `index.js`, `index.d.ts`, `services/`, `formatter/`
 
 **Step 4: Verify dist output structure**
@@ -2104,9 +2106,9 @@ The plugin shows user-friendly Markdown messages for common issues:
 ## Development
 
 ```bash
-bun install
-bun test
-bun run build
+npm install
+npm test
+npm run build
 ```
 
 ## License
@@ -2142,7 +2144,7 @@ Task 10: README              → depends on Task 9
 
 ## Commit Strategy
 
-1. `chore: project scaffolding with bun + typescript config`
+1. `chore: project scaffolding with npm + typescript config`
 2. `feat: add TypeScript type definitions for API + auth`
 3. `feat: AuthReader service — read auth.json, parse JWT, extract account_id + email`
 4. `feat: ApiClient service — query wham/usage endpoint with timeout + error mapping`

@@ -10,16 +10,18 @@ OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota**
 
 - **Single `/codex_quota` command** — a convenient wrapper that asks OpenCode to call the quota tool
 - **Rich Markdown output** — themed headers, progress bars, tables rendered by OpenCode TUI
-- **5h + Weekly windows** — primary 5-hour and secondary weekly usage with countdown timers
+- **5h + Weekly windows** — primary 5-hour and secondary weekly usage with local reset clocks
 - **Code review quota** — shown when applicable to your plan
 - **Credits & spend control** — balance, approximate message counts, spending status
-- **Warning banners** — proactive alerts at 50%, 80%, and 100% usage
-- **Two display modes** — full (user command) and compact (agent subtask)
+- **Advisory + warning banners** — pacing notes at 50%+, stronger warnings at 80%+, critical at 100%
+- **Two display modes** — full for `/codex_quota`, compact for agent/tool usage or `/codex_quota compact`
 - **Auth from OpenCode** — reads your existing `opencode auth login` credentials, no extra setup
 
 ## Screenshot
 
-*(Coming soon — plugin renders as styled Markdown in OpenCode TUI)*
+![OpenCode TUI screenshot showing the Codex quota report](docs/codex.png)
+
+Example full-mode output rendered in the OpenCode TUI.
 
 ## Install
 
@@ -74,6 +76,12 @@ code review quota, credits, spend control, and promotional info.
 
 Under the hood, the wrapper prompt asks OpenCode to call the `codex_quota` tool and present the result.
 
+You can also pass `compact` to the slash command when you want the shorter table:
+
+```
+/codex_quota compact
+```
+
 **Example output:**
 
 ```markdown
@@ -85,10 +93,22 @@ Under the hood, the wrapper prompt asks OpenCode to call the `codex_quota` tool 
 
 ## Quota Limits
 
-| Window | Usage | Progress | Resets In |
-|--------|-------|----------|-----------|
-| **Primary (5h)** | 25% | `███░░░░░░░░░` 25% | 1h 30m |
-| **Weekly** | 16% | `██░░░░░░░░░░` 16% | 5d 12h |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| **Primary (5h)** | 51% | `██████░░░░░░` 51% | 04:06:26 |
+| **Weekly** | 40% | `█████░░░░░░░` 40% | 05:46:54 on 9 Apr |
+
+---
+
+> ⚠️ Primary (5h) at 51% — consider pacing your usage.
+
+---
+
+## Code Review Quota
+
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| **Weekly** | 0% | `░░░░░░░░░░░░` 0% | 02:37:12 on 11 Apr |
 
 ---
 
@@ -114,10 +134,12 @@ codex_quota(mode="compact")
 ```markdown
 ### Codex Quota — Plus
 
-| Window | Usage | Progress | Reset |
-|--------|-------|----------|-------|
-| 5h | 25% | `███░░░░░░░░░` | 1h 30m |
-| Weekly | 16% | `██░░░░░░░░░░` | 5d 12h |
+| Window | Usage | Progress | Resets At |
+|--------|-------|----------|------------|
+| 5h | 51% | `██████░░░░░░` | 04:06:26 |
+| Weekly | 40% | `█████░░░░░░░` | 05:46:54 on 9 Apr |
+
+**Status**: ✅ Within limits
 ```
 
 ### Conditional Sections
@@ -129,7 +151,7 @@ Some sections appear only when relevant:
 | **Code Review Quota** | When your plan includes code review limits |
 | **Credits** | When you have credits or unlimited balance |
 | **Promotional** | When promotional quota is active |
-| **Warning banners** | When any window exceeds 80% |
+| **Warning banners** | When any window is 80–99% or 100% |
 | **Advisory notes** | When any window is 50–79% |
 
 ## Requirements
@@ -218,9 +240,9 @@ npm run lint:fix      # Fix code style issues
 Tests use `vitest` with the Arrange-Act-Assert pattern. Mocks for `fetch` and `fs` are set up per test.
 
 ```bash
-npm test                              # All tests
-npm test tests/auth-reader.test.ts    # Specific file
-npm run test:coverage                 # With coverage report
+npm test                                   # All tests
+npm test -- tests/auth-reader.test.ts      # Specific file
+npm run test:coverage                      # With coverage report
 ```
 
 ## Contributing
