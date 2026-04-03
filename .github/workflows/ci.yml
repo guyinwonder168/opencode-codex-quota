@@ -34,11 +34,24 @@ jobs:
 
   sonarqube:
     name: SonarQube
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate coverage
+        run: npx vitest run --coverage
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
