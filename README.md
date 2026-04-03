@@ -8,7 +8,7 @@ OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota**
 
 ## Features
 
-- **Single `/codex_quota` command** — one slash command, instant results
+- **Single `/codex_quota` command** — a convenient wrapper that asks OpenCode to call the quota tool
 - **Rich Markdown output** — themed headers, progress bars, tables rendered by OpenCode TUI
 - **5h + Weekly windows** — primary 5-hour and secondary weekly usage with countdown timers
 - **Code review quota** — shown when applicable to your plan
@@ -23,13 +23,7 @@ OpenCode plugin that displays your **ChatGPT Plus/Pro Codex subscription quota**
 
 ## Install
 
-### Via OpenCode CLI (recommended)
-
-```bash
-opencode plugin install opencode-codex-quota
-```
-
-### Via config file
+### Via config file (recommended)
 
 Add to your OpenCode config (`~/.config/opencode/config.json` or project `opencode.json`):
 
@@ -48,7 +42,7 @@ npm install
 npm run build
 ```
 
-Then add the local path to your config:
+Then point OpenCode at your local package directory:
 
 ```json
 {
@@ -56,9 +50,20 @@ Then add the local path to your config:
 }
 ```
 
+This project is packaged as an npm/path plugin. OpenCode also supports raw local plugin files placed directly in `.opencode/plugins/` or `~/.config/opencode/plugins/`, but that is a different layout from this repository.
+
+## How `/codex_quota` works
+
+In current OpenCode plugin APIs:
+
+- the `codex_quota` **tool** is exposed to the agent/tool loop
+- the `/codex_quota` **slash command** is a wrapper prompt that tells OpenCode to call that tool
+
+That means `/codex_quota` is convenient and reliable, but it is still **LLM-mediated**, not a direct no-LLM syscall.
+
 ## Usage
 
-### User Command (Full Mode)
+### Wrapper Command (Full Mode)
 
 ```
 /codex_quota
@@ -66,6 +71,8 @@ Then add the local path to your config:
 
 Shows complete quota details: plan type, primary 5h window, weekly window,
 code review quota, credits, spend control, and promotional info.
+
+Under the hood, the wrapper prompt asks OpenCode to call the `codex_quota` tool and present the result.
 
 **Example output:**
 
@@ -94,12 +101,12 @@ code review quota, credits, spend control, and promotional info.
 *Updated: 2026-03-29T12:00:00.000Z*
 ```
 
-### Agent Subtask (Compact Mode)
+### Agent / Tool Call (Compact Mode)
 
-The tool can be called by AI agents with `mode=compact` for concise output:
+The underlying tool supports `mode=compact` for concise output when called by an AI agent:
 
 ```
-/codex_quota mode=compact
+codex_quota(mode="compact")
 ```
 
 **Example output:**
@@ -172,7 +179,8 @@ opencode-codex-quota/
 **Data flow:**
 
 ```
-/codex_quota [mode?]
+/codex_quota
+  → wrapper prompt tells OpenCode to call tool.codex_quota
   → AuthReader: auth.json → JWT → { token, accountId, email }
   → ApiClient: GET wham/usage → QuotaResponse
   → Formatter: QuotaResponse + mode → Markdown string

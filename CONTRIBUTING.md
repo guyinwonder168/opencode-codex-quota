@@ -40,7 +40,7 @@ chore: update dependencies
 - **TypeScript strict mode** — no `any`, no `@ts-ignore`
 - **Functional patterns** — prefer pure functions, avoid classes
 - **No console.log in production code** — only in tests
-- **Named exports** — no default exports except the plugin entry point
+- **Exports** — prefer named exports in regular modules; use the modern default export object for the plugin entry point
 - **File structure**: one component per file, tests mirror source structure
 
 ### Formatting

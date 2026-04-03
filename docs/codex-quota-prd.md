@@ -304,7 +304,7 @@ args: {
 }
 ```
 
-- **User runs `/codex_quota`** → `mode` is undefined → defaults to `"full"`
+- **User runs `/codex_quota`** → OpenCode executes the command template, which instructs the agent to call the `codex_quota` tool with default `mode: "full"`
 - **Agent calls tool** → can pass `mode: "compact"` for concise output
 - **Invalid mode** → treated as `"full"`
 
@@ -315,10 +315,18 @@ Based on `@opencode-ai/plugin` (documented at https://opencode.ai/docs/plugins/)
 **Plugin entry point** (`src/index.ts`):
 
 ```typescript
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, type PluginModule, tool } from "@opencode-ai/plugin"
 
-export const CodexQuotaPlugin: Plugin = async (ctx) => {
+const codexQuotaServer: Plugin = async (ctx) => {
   return {
+    config: async (opencodeConfig) => {
+      opencodeConfig.command ??= {}
+      opencodeConfig.command.codex_quota = {
+        description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
+        template:
+          "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.",
+      }
+    },
     tool: {
       codex_quota: tool({
         description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
@@ -337,14 +345,20 @@ export const CodexQuotaPlugin: Plugin = async (ctx) => {
     },
   }
 }
+
+export default {
+  id: "opencode-codex-quota",
+  server: codexQuotaServer,
+} satisfies PluginModule
 ```
 
 **Key API details:**
 
 | Aspect | Detail |
 |--------|--------|
-| Export | Named `const` of type `Plugin` (async function) |
+| Export | Default export object with `id` + `server` |
 | Plugin context | `{ project, client, $, directory, worktree }` |
+| Slash command | Wrapper prompt registered via `config.command.codex_quota` |
 | Tool registration | `return { tool: { <name>: tool({ description, args, execute }) } }` |
 | Schema builder | `tool.schema.string()`, `tool.schema.optional()`, `.describe()` — Zod-based |
 | Execute args | First arg: validated args object. Second arg: `{ directory, worktree }` |
@@ -355,7 +369,8 @@ export const CodexQuotaPlugin: Plugin = async (ctx) => {
 **Constraints:**
 - Plugin function is called once at load time; hooks/tools are registered statically
 - No lifecycle hooks needed — fresh read on each `execute()` call (no caching, per G5)
-- Tool name `codex_quota` is the identifier; user invokes via `/codex_quota` in TUI
+- Tool name `codex_quota` is the identifier the agent calls
+- `/codex_quota` is a convenience wrapper prompt, not a direct no-LLM syscall
 
 ---
 
@@ -667,7 +682,15 @@ User adds to their OpenCode config (`opencode.json` in project root or `~/.confi
 }
 ```
 
-Or for local development, place the built files in `.opencode/plugins/` or `~/.config/opencode/plugins/`.
+For local development, point OpenCode at the package directory after building:
+
+```json
+{
+  "plugin": ["./path/to/opencode-codex-quota"]
+}
+```
+
+OpenCode also supports raw local plugin files placed directly in `.opencode/plugins/` or `~/.config/opencode/plugins/`, but that is a different layout from this packaged npm/path plugin.
 
 ---
 

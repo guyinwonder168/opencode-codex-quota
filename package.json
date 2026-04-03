@@ -22,12 +22,14 @@
     "url": "git+https://github.com/guyinwonder168/opencode-codex-quota.git"
   },
   "license": "MIT",
+  "type": "module",
   "author": "guyinwonder168",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist/"
-  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./server": "./dist/index.js"
+  },
+  "files": ["dist/"],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",

@@ -4,7 +4,9 @@
 
 **Goal:** Build an OpenCode plugin that queries ChatGPT Plus/Pro Codex subscription quota and displays it as rich Markdown in the TUI via a single `/codex_quota` command.
 
-**Architecture:** Component-Service pattern — `AuthReader` reads `~/.local/share/opencode/auth.json`, parses JWT for account_id + email. `ApiClient` calls `chatgpt.com/backend-api/wham/usage` with OAuth token. `Formatter` transforms the typed response into raw Markdown string. Plugin entry point wires them together as a single tool.
+**Architecture:** Component-Service pattern — `AuthReader` reads `~/.local/share/opencode/auth.json`, parses JWT for account_id + email. `ApiClient` calls `chatgpt.com/backend-api/wham/usage` with OAuth token. `Formatter` transforms the typed response into raw Markdown string. Plugin entry point uses the modern OpenCode `default export { id, server }` module shape and wires everything into a single `codex_quota` tool.
+
+**Command Behavior:** In current OpenCode, plugin tools are exposed to the LLM/tool loop. Custom `/` commands are prompt templates, not direct tool syscalls. Therefore `/codex_quota` must be implemented as a reliable wrapper prompt that strongly instructs OpenCode to call the `codex_quota` tool. A true no-LLM direct slash-command path is out of scope for this plan because current plugin docs/source do not expose one.
 
 **Tech Stack:** TypeScript (strict), Node.js, `vitest`, `@opencode-ai/plugin` SDK (Zod-based `tool.schema`), `biome` for linting, zero runtime dependencies beyond the SDK.
 
@@ -27,8 +29,13 @@
   "name": "opencode-codex-quota",
   "version": "0.1.0",
   "description": "OpenCode plugin to display ChatGPT Plus/Pro Codex subscription quota",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./server": "./dist/index.js"
+  },
+  "files": ["dist/"],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -1730,6 +1737,13 @@ git commit -m "feat: error formatter — Markdown output for all E1–E11 scenar
 
 **Reference:** PRD 8.4 (Display Mode Trigger), 8.5 (Plugin API Contract), 11.1 (Architecture), 11.3 (Plugin Lifecycle)
 
+**Modernization requirements for this task:**
+- Use `export default { id, server }` (modern `PluginModule` shape), not the legacy named function export.
+- Keep the server implementation as a small internal `Plugin` function.
+- Register `/codex_quota` as a wrapper prompt with a non-empty template that explicitly tells OpenCode to call the `codex_quota` tool.
+- Keep the wrapper honest: it improves reliability, but it is still LLM-mediated.
+- Package the plugin for npm loading with `exports["./server"]` and `main: "./dist/index.js"`.
+
 **Step 1: Write failing test for the plugin entry point**
 
 `tests/index.test.ts`:
@@ -1740,18 +1754,32 @@ import { mkdir, writeFile, rm } from "fs/promises"
 import { join } from "path"
 import { tmpdir } from "os"
 
-// Test the CodexQuotaPlugin export exists and has the right shape
-describe("CodexQuotaPlugin", () => {
-  test("exports a named const that is a function", async () => {
+// Test the modern default export exists and has the right shape
+describe("default plugin module", () => {
+  test("exports a default object with id and server", async () => {
     const mod = await import("../src/index")
-    expect(typeof mod.CodexQuotaPlugin).toBe("function")
+    expect(mod.default).toBeDefined()
+    expect(mod.default.id).toBe("opencode-codex-quota")
+    expect(typeof mod.default.server).toBe("function")
   })
 
-  test("calling the plugin returns an object with tool.codex_quota", async () => {
+  test("calling default.server returns hooks with tool.codex_quota", async () => {
     const mod = await import("../src/index")
-    const result = await mod.CodexQuotaPlugin({} as never)
+    const result = await mod.default.server({} as never)
     expect(result).toHaveProperty("tool")
     expect(result.tool).toHaveProperty("codex_quota")
+  })
+
+  test("config hook registers /codex_quota wrapper prompt", async () => {
+    const mod = await import("../src/index")
+    const hooks = await mod.default.server({} as never)
+    const cfg: { command?: Record<string, { template: string; description: string }> } = {}
+
+    await hooks.config?.(cfg as never)
+
+    expect(cfg.command?.codex_quota).toBeDefined()
+    expect(cfg.command?.codex_quota.description).toContain("quota")
+    expect(cfg.command?.codex_quota.template).toContain("Call the codex_quota tool")
   })
 })
 ```
@@ -1766,15 +1794,23 @@ Expected: FAIL — `src/index.ts` is empty
 `src/index.ts`:
 
 ```typescript
-import { type Plugin, tool } from "@opencode-ai/plugin"
+import { type Plugin, type PluginModule, tool } from "@opencode-ai/plugin"
 import { readAuth } from "./services/auth-reader"
 import { queryQuota } from "./services/api-client"
 import { formatQuota } from "./formatter/markdown"
 import { formatError } from "./formatter/errors"
 import type { DisplayMode } from "./types"
 
-export const CodexQuotaPlugin: Plugin = async () => {
+const codexQuotaServer: Plugin = async () => {
   return {
+    config: async (opencodeConfig) => {
+      opencodeConfig.command ??= {}
+      opencodeConfig.command.codex_quota = {
+        description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
+        template:
+          "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.",
+      }
+    },
     tool: {
       codex_quota: tool({
         description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
@@ -1809,6 +1845,13 @@ export const CodexQuotaPlugin: Plugin = async () => {
     },
   }
 }
+
+const plugin: PluginModule = {
+  id: "opencode-codex-quota",
+  server: codexQuotaServer,
+}
+
+export default plugin
 ```
 
 **Step 4: Verify TypeScript compiles**
@@ -1830,7 +1873,7 @@ Expected: ALL PASS
 
 ```bash
 git add src/index.ts tests/index.test.ts
-git commit -m "feat: plugin entry point — codex_quota tool with compact/full modes"
+git commit -m "feat: modernize plugin module and codex_quota wrapper command"
 ```
 
 ---
@@ -2202,12 +2245,12 @@ Add to your `opencode.json` config:
 Shows complete quota details: plan type, primary 5h window, weekly window,
 code review quota, credits, spend control, and promotional info.
 
-### Agent Subtask (Compact Mode)
+### Agent / Tool Call (Compact Mode)
 
-The tool can be called by AI agents with compact mode for concise output:
+The underlying tool can be called by AI agents with compact mode for concise output:
 
 ```
-/codex_quota mode=compact
+codex_quota(mode="compact")
 ```
 
 ## Requirements

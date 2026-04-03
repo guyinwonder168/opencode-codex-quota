@@ -9,7 +9,7 @@ vi.mock("../src/services/api-client", () => ({
   queryQuota: vi.fn(),
 }));
 
-import { CodexQuotaPlugin } from "../src/index";
+import codexQuotaPlugin from "../src/index";
 import { queryQuota } from "../src/services/api-client";
 import { readAuth } from "../src/services/auth-reader";
 
@@ -70,7 +70,7 @@ function mockAuthSuccess(
 }
 
 // Stub plugin input (unused by our plugin but required by Plugin signature)
-const mockInput = {} as Parameters<typeof CodexQuotaPlugin>[0];
+const mockInput = {} as Parameters<typeof codexQuotaPlugin.server>[0];
 
 // Stub tool context
 const mockContext = {
@@ -85,7 +85,7 @@ const mockContext = {
 };
 
 async function getToolExecute() {
-  const hooks = await CodexQuotaPlugin(mockInput);
+  const hooks = await codexQuotaPlugin.server(mockInput);
   expect(hooks.tool).toBeDefined();
   const toolDef = hooks.tool?.codex_quota;
   expect(toolDef).toBeDefined();
@@ -97,21 +97,25 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+const expectedCommandTemplate =
+  "Call the codex_quota tool now. Use mode=compact only if the user explicitly requested compact output; otherwise use mode=full. Present the tool result directly.";
+
 // ─── Plugin export shape ─────────────────────────────────────────────
 
-describe("CodexQuotaPlugin — export shape", () => {
-  test("is a function", () => {
-    expect(typeof CodexQuotaPlugin).toBe("function");
+describe("codexQuotaPlugin — export shape", () => {
+  test("default export includes id and server", () => {
+    expect(codexQuotaPlugin.id).toBe("opencode-codex-quota");
+    expect(typeof codexQuotaPlugin.server).toBe("function");
   });
 
-  test("returns hooks with tool.codex_quota", async () => {
-    const hooks = await CodexQuotaPlugin(mockInput);
+  test("server returns hooks with tool.codex_quota", async () => {
+    const hooks = await codexQuotaPlugin.server(mockInput);
     expect(hooks).toHaveProperty("tool");
     expect(hooks.tool).toHaveProperty("codex_quota");
   });
 
   test("codex_quota tool has description, args, and execute", async () => {
-    const hooks = await CodexQuotaPlugin(mockInput);
+    const hooks = await codexQuotaPlugin.server(mockInput);
     const t = hooks.tool?.codex_quota;
     expect(t).toBeDefined();
     expect(typeof t?.description).toBe("string");
@@ -119,11 +123,83 @@ describe("CodexQuotaPlugin — export shape", () => {
     expect(t?.args).toHaveProperty("mode");
     expect(typeof t?.execute).toBe("function");
   });
+
+  test("returns hooks with config function", async () => {
+    const hooks = await codexQuotaPlugin.server(mockInput);
+    expect(hooks).toHaveProperty("config");
+    expect(typeof hooks.config).toBe("function");
+  });
+
+  test("config hook registers /codex_quota command", async () => {
+    const hooks = await codexQuotaPlugin.server(mockInput);
+    expect(hooks.config).toBeDefined();
+
+    // Mock opencodeConfig object
+    const opencodeConfig: {
+      command?: Record<string, { template: string; description: string }>;
+    } = {};
+
+    // Call config hook
+    await (hooks.config as (cfg: typeof opencodeConfig) => Promise<void>)(
+      opencodeConfig,
+    );
+
+    // Verify command was registered
+    expect(opencodeConfig.command).toBeDefined();
+    expect(opencodeConfig.command).toHaveProperty("codex_quota");
+    expect(opencodeConfig.command?.codex_quota).toEqual({
+      template: expectedCommandTemplate,
+      description: "Show ChatGPT Plus/Pro Codex subscription quota usage",
+    });
+  });
+
+  test("config hook preserves existing commands", async () => {
+    const hooks = await codexQuotaPlugin.server(mockInput);
+
+    // Mock opencodeConfig with existing command
+    const opencodeConfig: {
+      command?: Record<string, { template: string; description: string }>;
+    } = {
+      command: {
+        existing: { template: "test", description: "Existing command" },
+      },
+    };
+
+    // Call config hook
+    await (hooks.config as (cfg: typeof opencodeConfig) => Promise<void>)(
+      opencodeConfig,
+    );
+
+    // Verify existing command is preserved
+    expect(opencodeConfig.command).toHaveProperty("existing");
+    expect(opencodeConfig.command?.existing).toEqual({
+      template: "test",
+      description: "Existing command",
+    });
+    // And codex_quota is added
+    expect(opencodeConfig.command).toHaveProperty("codex_quota");
+  });
+
+  test("command template explicitly tells OpenCode to call the codex_quota tool", async () => {
+    const hooks = await codexQuotaPlugin.server(mockInput);
+    const opencodeConfig: {
+      command?: Record<string, { template: string; description: string }>;
+    } = {};
+
+    await (hooks.config as (cfg: typeof opencodeConfig) => Promise<void>)(
+      opencodeConfig,
+    );
+
+    expect(opencodeConfig.command?.codex_quota.template).toContain(
+      "Call the codex_quota tool now",
+    );
+    expect(opencodeConfig.command?.codex_quota.template).toContain("mode=full");
+  });
 });
 
 // ─── Happy path (full mode) ──────────────────────────────────────────
 
-describe("CodexQuotaPlugin — happy path (full mode)", () => {
+describe("codexQuotaPlugin — happy path (full mode)", () => {
   test("returns formatted markdown for valid data with mode='full'", async () => {
     mockedReadAuth.mockResolvedValueOnce(mockAuthSuccess());
     mockedQueryQuota.mockResolvedValueOnce({
@@ -164,7 +240,7 @@ describe("CodexQuotaPlugin — happy path (full mode)", () => {
 
 // ─── Happy path (compact mode) ───────────────────────────────────────
 
-describe("CodexQuotaPlugin — happy path (compact mode)", () => {
+describe("codexQuotaPlugin — happy path (compact mode)", () => {
   test("returns compact formatted output", async () => {
     mockedReadAuth.mockResolvedValueOnce(mockAuthSuccess());
     mockedQueryQuota.mockResolvedValueOnce({
@@ -184,7 +260,7 @@ describe("CodexQuotaPlugin — happy path (compact mode)", () => {
 
 // ─── Auth failure ────────────────────────────────────────────────────
 
-describe("CodexQuotaPlugin — auth failure", () => {
+describe("codexQuotaPlugin — auth failure", () => {
   test("returns error markdown when readAuth fails (E1)", async () => {
     mockedReadAuth.mockResolvedValueOnce({ ok: false, error: "E1" });
 
@@ -217,7 +293,7 @@ describe("CodexQuotaPlugin — auth failure", () => {
 
 // ─── API failure ─────────────────────────────────────────────────────
 
-describe("CodexQuotaPlugin — API failure", () => {
+describe("codexQuotaPlugin — API failure", () => {
   test("returns error markdown when queryQuota fails (E4 network)", async () => {
     mockedReadAuth.mockResolvedValueOnce(mockAuthSuccess());
     mockedQueryQuota.mockResolvedValueOnce({ ok: false, error: "E4" });
@@ -271,7 +347,7 @@ describe("CodexQuotaPlugin — API failure", () => {
 
 // ─── Default / invalid mode ──────────────────────────────────────────
 
-describe("CodexQuotaPlugin — mode handling", () => {
+describe("codexQuotaPlugin — mode handling", () => {
   test("undefined mode defaults to 'full' output", async () => {
     mockedReadAuth.mockResolvedValueOnce(mockAuthSuccess());
     mockedQueryQuota.mockResolvedValueOnce({
