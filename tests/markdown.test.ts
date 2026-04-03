@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildProgressBar,
   formatQuota,
-  formatTime,
+  formatResetClock,
 } from "../src/formatter/markdown";
 import type { QuotaResponse } from "../src/types";
 
@@ -73,30 +73,24 @@ describe("buildProgressBar", () => {
   });
 });
 
-// === formatTime ===
-describe("formatTime", () => {
-  test("0 seconds → now", () => {
-    expect(formatTime(0)).toBe("now");
+// === formatResetClock ===
+describe("formatResetClock", () => {
+  test("same-day reset → HH:mm:ss", () => {
+    const referenceDate = new Date("2025-04-08T12:00:00");
+    const sameDayReset = Math.floor(
+      new Date("2025-04-08T04:06:00").getTime() / 1000,
+    );
+    expect(formatResetClock(sameDayReset, referenceDate)).toBe("04:06:00");
   });
 
-  test("45 seconds → 45s", () => {
-    expect(formatTime(45)).toBe("45s");
-  });
-
-  test("125 seconds → 2m 5s", () => {
-    expect(formatTime(125)).toBe("2m 5s");
-  });
-
-  test("3600 seconds → 1h 0m", () => {
-    expect(formatTime(3600)).toBe("1h 0m");
-  });
-
-  test("90061 seconds → 1d 1h", () => {
-    expect(formatTime(90061)).toBe("1d 1h");
-  });
-
-  test("86400 seconds → 1d 0h", () => {
-    expect(formatTime(86400)).toBe("1d 0h");
+  test("different-day reset → HH:mm:ss on D MMM", () => {
+    const referenceDate = new Date("2025-04-08T12:00:00");
+    const nextDayReset = Math.floor(
+      new Date("2025-04-09T05:46:00").getTime() / 1000,
+    );
+    expect(formatResetClock(nextDayReset, referenceDate)).toBe(
+      "05:46:00 on 9 Apr",
+    );
   });
 });
 
@@ -113,12 +107,15 @@ describe("formatQuota — full mode", () => {
     expect(result).toContain("**Primary (5h)**");
     expect(result).toContain("25%");
     expect(result).toContain("███░░░░░░░░░");
+    expect(result).toContain("Resets At");
+    expect(result).not.toContain("Resets In");
   });
 
   test("includes secondary window when present", () => {
     const result = formatQuota(createBaseResponse(), "full");
     expect(result).toContain("**Weekly**");
     expect(result).toContain("16%");
+    expect(result).toContain("Resets At");
   });
 
   test("skips secondary window row when null", () => {
@@ -139,7 +136,7 @@ describe("formatQuota — full mode", () => {
     expect(result).not.toContain("**Weekly**");
   });
 
-  test("shows code review section when primary_window is not null", () => {
+  test("shows code review section with clock-style reset time", () => {
     const withCodeReview = createBaseResponse({
       code_review_rate_limit: {
         allowed: true,
@@ -155,6 +152,8 @@ describe("formatQuota — full mode", () => {
     });
     const result = formatQuota(withCodeReview, "full");
     expect(result).toContain("## Code Review Quota");
+    expect(result).toContain("Resets At");
+    expect(result).not.toContain("Resets In");
   });
 
   test("hides code review section when primary_window is null", () => {
@@ -328,6 +327,8 @@ describe("formatQuota — compact mode", () => {
     const result = formatQuota(createBaseResponse(), "compact");
     expect(result).toContain("| 5h |");
     expect(result).toContain("| Weekly |");
+    expect(result).toContain("Resets At");
+    expect(result).not.toContain("Reset |");
   });
 
   test("does NOT show code review, credits, spend control, promo", () => {
