@@ -62,8 +62,10 @@ function e6(): string {
 }
 
 function e7(partialData?: unknown): string {
-  const dataStr =
-    partialData != null ? JSON.stringify(partialData, null, 2) : "(no data)";
+  let dataStr = "(no data)";
+  if (partialData !== null && partialData !== undefined) {
+    dataStr = JSON.stringify(partialData, null, 2);
+  }
   return [
     "## ⚠️ Codex Quota — Partial Data",
     "",

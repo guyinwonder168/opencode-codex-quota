@@ -12,57 +12,61 @@ export type ApiResult =
 const API_URL = "https://chatgpt.com/backend-api/wham/usage";
 const TIMEOUT_MS = 10_000;
 
+/** Check that value is a non-null record with all required string fields. */
+function hasStrings(v: unknown, ...keys: string[]): boolean {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return keys.every((k) => typeof r[k] === "string");
+}
+
+/** Check that value is a non-null record with all required boolean fields. */
+function hasBooleans(v: unknown, ...keys: string[]): boolean {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return keys.every((k) => typeof r[k] === "boolean");
+}
+
+/** Check that value is a non-null record with all required number fields. */
+function hasNumbers(v: unknown, ...keys: string[]): boolean {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  return keys.every((k) => typeof r[k] === "number");
+}
+
+/** Validate optional window object (nullable, but shape-checked if present). */
+function isValidWindow(w: unknown): boolean {
+  if (w === null || w === undefined) return true;
+  return hasNumbers(
+    w,
+    "used_percent",
+    "limit_window_seconds",
+    "reset_after_seconds",
+    "reset_at",
+  );
+}
+
 /**
  * Validates that parsed JSON data has the required QuotaResponse shape.
  * Checks both top-level and nested required fields for type safety.
  * `code_review_rate_limit` is OPTIONAL and not checked here.
  */
 function validateResponse(data: unknown): data is QuotaResponse {
-  if (typeof data !== "object" || data === null) return false;
+  if (!hasStrings(data, "user_id", "account_id", "email", "plan_type"))
+    return false;
   const d = data as Record<string, unknown>;
 
-  // Top-level required strings
-  if (typeof d.user_id !== "string") return false;
-  if (typeof d.account_id !== "string") return false;
-  if (typeof d.email !== "string") return false;
-  if (typeof d.plan_type !== "string") return false;
-
-  // rate_limit — must be non-null object with boolean fields
-  if (typeof d.rate_limit !== "object" || d.rate_limit === null) return false;
+  // rate_limit — must be non-null object with boolean fields + windows
+  if (!hasBooleans(d.rate_limit, "allowed", "limit_reached")) return false;
   const rl = d.rate_limit as Record<string, unknown>;
-  if (typeof rl.allowed !== "boolean") return false;
-  if (typeof rl.limit_reached !== "boolean") return false;
-  // primary_window: required but nullable — validate shape if present
-  if (rl.primary_window !== null && rl.primary_window !== undefined) {
-    if (typeof rl.primary_window !== "object") return false;
-    const pw = rl.primary_window as Record<string, unknown>;
-    if (typeof pw.used_percent !== "number") return false;
-    if (typeof pw.limit_window_seconds !== "number") return false;
-    if (typeof pw.reset_after_seconds !== "number") return false;
-    if (typeof pw.reset_at !== "number") return false;
-  }
-  // secondary_window: optional, validate shape if present
-  if (rl.secondary_window !== null && rl.secondary_window !== undefined) {
-    if (typeof rl.secondary_window !== "object") return false;
-    const sw = rl.secondary_window as Record<string, unknown>;
-    if (typeof sw.used_percent !== "number") return false;
-    if (typeof sw.limit_window_seconds !== "number") return false;
-    if (typeof sw.reset_after_seconds !== "number") return false;
-    if (typeof sw.reset_at !== "number") return false;
-  }
+  if (!isValidWindow(rl.primary_window)) return false;
+  if (!isValidWindow(rl.secondary_window)) return false;
 
   // credits — must be non-null object with required fields
-  if (typeof d.credits !== "object" || d.credits === null) return false;
-  const cr = d.credits as Record<string, unknown>;
-  if (typeof cr.has_credits !== "boolean") return false;
-  if (typeof cr.unlimited !== "boolean") return false;
-  if (typeof cr.balance !== "string") return false;
+  if (!hasBooleans(d.credits, "has_credits", "unlimited")) return false;
+  if (!hasStrings(d.credits, "balance")) return false;
 
   // spend_control — must be non-null object with boolean field
-  if (typeof d.spend_control !== "object" || d.spend_control === null)
-    return false;
-  const sc = d.spend_control as Record<string, unknown>;
-  if (typeof sc.reached !== "boolean") return false;
+  if (!hasBooleans(d.spend_control, "reached")) return false;
 
   return true;
 }
