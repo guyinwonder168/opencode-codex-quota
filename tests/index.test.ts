@@ -354,6 +354,24 @@ describe("command.execute.before hook", () => {
     expect(instruction).toContain("04:06:26");
     expect(instruction).toContain("~4h 6m");
   });
+
+  test("marks injected instruction part as synthetic", async () => {
+    const hook = await getCommandHook();
+    const input = {
+      command: "codex_quota" as const,
+      sessionID: "test-session",
+      arguments: "compact",
+    };
+    const output = createCommandOutput();
+
+    await hook(input, output);
+
+    expect(output.parts).toHaveLength(1);
+    expect(output.parts[0]).toMatchObject({
+      type: "text",
+      synthetic: true,
+    });
+  });
 });
 
 // ─── Happy path (full mode) ──────────────────────────────────────────

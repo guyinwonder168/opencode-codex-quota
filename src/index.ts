@@ -51,7 +51,11 @@ const codexQuotaServer: Plugin = async (_input) => {
       const instruction = buildCommandInstruction(mode);
 
       output.parts.length = 0;
-      output.parts.push({ type: "text", text: instruction } as Part);
+      output.parts.push({
+        type: "text",
+        text: instruction,
+        synthetic: true,
+      } as Part);
     },
 
     tool: {
