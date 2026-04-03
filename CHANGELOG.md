@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Upgrade `@biomejs/biome` from 1.9.4 to 2.4.10 (migrated config via `biome migrate`)
+- Upgrade `typescript` from 5.9.3 to 6.0.2
+- Upgrade `vitest` from 3.2.4 to 4.1.2
+- Upgrade `@vitest/coverage-v8` from 3.2.4 to 4.1.2
+- Upgrade `@types/node` from 22.19.15 to 25.5.2
+- Bump minimum Node.js version from 18 to 20
+- Biome config: `organizeImports.enabled` migrated to `assist.actions.source.organizeImports`
+
 ## [1.0.0] - 2026-04-04
 
 ### Added
