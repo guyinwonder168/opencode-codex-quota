@@ -220,8 +220,8 @@ opencode-codex-quota/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) >= 18
-- TypeScript >= 5.7
+- [Node.js](https://nodejs.org) >= 20
+- TypeScript >= 6.0
 
 ### Setup
 
