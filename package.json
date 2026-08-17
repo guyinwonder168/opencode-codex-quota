@@ -48,7 +48,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.0",
     "@opencode-ai/plugin": "^1.17.7",
-    "@types/node": "25.9.3",
+    "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
